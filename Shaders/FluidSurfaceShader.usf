@@ -1,0 +1,414 @@
+
+
+/*==============================================================================
+	FluidSurfaceShader.usf: Shader to compute fluid surfaces.
+==============================================================================*/
+
+#include "Common.usf"
+
+/** 
+
+Uniform Buffers
+
+FluidSurfaceParams --> Contains parameters that don't change
+ int   FluidGridType
+ float FluidGridSpacing
+ int   FluidXSize
+ int   FluidYSize
+ 
+FluidSurfaceFrameParams --> Contains parameters that can change per frame
+ float  UpdateRate
+ float  FluidNoiseStrengthMin
+ float  FluidNoiseStrengthMax
+ float  FluidSpeed
+ float  DeltaTime
+ float  Time
+ float4 FluidOriginDamping
+ float  FluidNoiseFrequency
+ int    LatestVerts
+ int    NumPLings
+
+*/
+
+struct FFluidSurfacePLingParameters
+{
+	float3 LocalHitPosition;
+	int HitX;
+	int HitY;
+	float Strength;
+	float Radius;
+};
+
+/** Output fluid surface */
+RWTexture2D<float4> OutFluidSurface;
+
+/** Fluid buffers for flip/flop */
+RWBuffer<float> FluidVerts0;
+RWBuffer<float> FluidVerts1;
+
+/** Input Fluid PLing Buffer */
+//Buffer<float> FluidPLingBuffer;
+StructuredBuffer<FFluidSurfacePLingParameters> FluidPLingBuffer;
+
+/** Sets a vertex in the latest fluid buffer */
+void SetVertex( int2 Pos, float Value )
+{
+	if( FluidSurfaceFrameParams.LatestVerts == 0 )
+	{
+		FluidVerts0[ Pos.y * FluidSurfaceParams.FluidXSize + Pos.x ] = Value;
+	}
+	else
+	{
+		FluidVerts1[ Pos.y * FluidSurfaceParams.FluidXSize + Pos.x ] = Value;
+	}
+}
+
+/** Sets a vertex in the old fluid buffer */
+void SetOldVertex( int2 Pos, float Value )
+{
+	if( FluidSurfaceFrameParams.LatestVerts == 0 )
+	{
+		FluidVerts1[ Pos.y * FluidSurfaceParams.FluidXSize + Pos.x ] = Value;
+	}
+	else
+	{
+		FluidVerts0[ Pos.y * FluidSurfaceParams.FluidXSize + Pos.x ] = Value;
+	}
+}
+
+
+/** Obtains a vertex value from the latest fluid buffer */
+float GetVertex( int2 Pos )
+{
+	if( FluidSurfaceFrameParams.LatestVerts == 0 )
+	{
+		return FluidVerts0[ Pos.y * FluidSurfaceParams.FluidXSize + Pos.x ];
+	}
+	else
+	{
+		return FluidVerts1[ Pos.y * FluidSurfaceParams.FluidXSize + Pos.x ];
+	}
+}
+
+/** Obtains a vertex value from the older fluid buffer */
+float GetOldVertex( int2 Pos )
+{
+	if( FluidSurfaceFrameParams.LatestVerts == 1 )
+	{
+		return FluidVerts0[ Pos.y * FluidSurfaceParams.FluidXSize + Pos.x ];
+	}
+	else
+	{
+		return FluidVerts1[ Pos.y * FluidSurfaceParams.FluidXSize + Pos.x ];
+	}
+}
+
+/** Returns a random value between 0 - 32767 */
+int Rand( float2 Seed )
+{
+	float RandNum = ( PerlinNoise2D_ALU( Seed ) + 1.0f ) * 0.5f;
+	return int( RandNum * 32767.0f );
+}
+
+/** Returns a random float between 0.0 - 1.0 */
+float FRand( float2 Seed )
+{
+	return ( PerlinNoise2D_ALU( Seed ) + 1.0f ) * 0.5f;
+}
+
+/* Check if current position is outside grid */
+bool OutsideBounds( uint2 ThreadId )
+{
+	if( ThreadId.x < 1 || ThreadId.x > ( FluidSurfaceParams.FluidXSize - 2 ) )
+		return true;
+		
+	if( ThreadId.y < 1 || ThreadId.y > ( FluidSurfaceParams.FluidYSize - 2 ) )
+		return true;
+		
+	return false;
+}
+
+/** Pling vertex */
+void PlingVertex( int2 Pos, float Strength )
+{
+	if( Pos.x < 1 || Pos.x > ( FluidSurfaceParams.FluidXSize - 2 ) )
+		return;
+		
+	if( Pos.y < 1 || Pos.y > ( FluidSurfaceParams.FluidYSize - 2 ) )
+		return;
+	
+	float OrigValue = GetOldVertex( Pos.xy );
+	SetOldVertex( Pos.xy, OrigValue + ( Strength * ( 1.0f / FluidSurfaceFrameParams.UpdateRate ) ) );
+}
+
+/** Pling
+    @todo: Move actual pling code to GPU 
+  */
+//void Pling( int2 ThreadId, float Strength )
+//{
+//	PlingVertex( ThreadId, Strength );
+//}
+
+float3 GetVertexPosLocal( int2 Position )
+{
+	float3 LocalPos;
+	if( FluidSurfaceParams.FluidGridType == 1 )
+	{
+		LocalPos.x = FluidSurfaceFrameParams.FluidOriginDamping.x + Position.x * FluidSurfaceParams.FluidGridSpacing;
+		if( Position.x & 0x01 )
+			LocalPos.x += 0.5f * FluidSurfaceParams.FluidGridSpacing;
+			
+		LocalPos.y = FluidSurfaceFrameParams.FluidOriginDamping.y + 0.866025f * Position.y * FluidSurfaceParams.FluidGridSpacing;
+		LocalPos.z = FluidSurfaceFrameParams.FluidOriginDamping.z;
+	}
+	else
+	{
+		LocalPos.x = FluidSurfaceFrameParams.FluidOriginDamping.x + Position.x * FluidSurfaceParams.FluidGridSpacing;
+		LocalPos.y = FluidSurfaceFrameParams.FluidOriginDamping.y + Position.y * FluidSurfaceParams.FluidGridSpacing;
+		LocalPos.z = FluidSurfaceFrameParams.FluidOriginDamping.z;
+	}
+	
+	return LocalPos;
+}
+
+void Pling( FFluidSurfacePLingParameters Params )
+{
+	if( Params.Radius > 0.01f )
+	{
+		int x, y;
+		int RadX, MinX, MaxX, RadY, MinY, MaxY;
+		
+		RadX = ceil( Params.Radius / FluidSurfaceParams.FluidGridSpacing );
+		if( FluidSurfaceParams.FluidGridType == 1 )
+			RadY = ceil( Params.Radius / ( 0.866025f * FluidSurfaceParams.FluidGridSpacing ) );
+		else
+			RadY = ceil( Params.Radius / FluidSurfaceParams.FluidGridSpacing );
+			
+		MinX = Params.HitX - RadX;
+		MaxX = Params.HitX + RadX;
+		
+		MinY = Params.HitY - RadY;
+		MaxY = Params.HitY + RadY;
+		
+		for( y = MinY; y <= MaxY; y++ )
+		{
+			for( x = MinX; x <= MaxX; x++ )
+			{
+				float3 LocalVertPos = GetVertexPosLocal( int2( x, y ) );
+				float3 LocalOffset = ( LocalVertPos - Params.LocalHitPosition );
+				float a2 = ( ( LocalOffset.x * LocalOffset.x ) + ( LocalOffset.y * LocalOffset.y ) );
+				
+				if( a2 < ( Params.Radius * Params.Radius ) )
+				{
+					if( !( OutsideBounds( int2( x, y ) ) ) )
+					{
+						float h = sqrt( ( Params.Radius * Params.Radius ) - a2 );
+						PlingVertex( int2( x, y ), ( h / Params.Radius * Params.Strength ) );
+					}
+				}
+			}
+		}
+	}
+	else
+	{
+		if( !( OutsideBounds( int2( Params.HitX, Params.HitY ) ) ) )
+		{
+			PlingVertex( int2( Params.HitX, Params.HitY ), Params.Strength );
+		}
+	}
+}
+
+/** Updates simulation on hex grids */
+void UpdateSimulationHex( int2 Pos )
+{
+	if( OutsideBounds( Pos ) )
+		return;
+		
+	float Curve;
+	float DampFactor = 1.0f - ( FluidSurfaceFrameParams.FluidOriginDamping.w * FluidSurfaceFrameParams.DeltaTime );
+	float C2T2 = ( FluidSurfaceFrameParams.FluidSpeed * FluidSurfaceFrameParams.DeltaTime ) * ( FluidSurfaceFrameParams.FluidSpeed * FluidSurfaceFrameParams.DeltaTime );
+	float RecipH2 = 1.0f / ( FluidSurfaceParams.FluidGridSpacing * FluidSurfaceParams.FluidGridSpacing );
+	
+	float SH[6];
+	float OrigVert = GetVertex( Pos.xy );
+	float OrigVertOld = GetOldVertex( Pos.xy );
+	
+	if( ( Pos.y % 2 ) == 0 )
+	{
+		SH[0] = GetOldVertex( int2( Pos.x - 1, Pos.y     ) );
+		SH[1] = GetOldVertex( int2( Pos.x - 1, Pos.y + 1 ) );
+		SH[2] = GetOldVertex( int2( Pos.x    , Pos.y + 1 ) );
+		SH[3] = GetOldVertex( int2( Pos.x + 1, Pos.y     ) );
+		SH[4] = GetOldVertex( int2( Pos.x    , Pos.y - 1 ) );
+		SH[5] = GetOldVertex( int2( Pos.x - 1, Pos.y - 1 ) );		
+	}
+	else
+	{
+		SH[0] = GetOldVertex( int2( Pos.x - 1, Pos.y     ) );
+		SH[1] = GetOldVertex( int2( Pos.x    , Pos.y + 1 ) );
+		SH[2] = GetOldVertex( int2( Pos.x + 1, Pos.y + 1 ) );
+		SH[3] = GetOldVertex( int2( Pos.x + 1, Pos.y     ) );
+		SH[4] = GetOldVertex( int2( Pos.x + 1, Pos.y - 1 ) );
+		SH[5] = GetOldVertex( int2( Pos.x    , Pos.y - 1 ) );
+	}
+	
+	Curve = RecipH2 * ( SH[0] + SH[1] + SH[2] + SH[3] + SH[4] + SH[5] - 6 * OrigVertOld );	
+	SetVertex( Pos.xy, ( C2T2 * Curve + ( 2 * OrigVertOld ) - OrigVert ) * DampFactor );
+}
+
+/** Update simulation on rectangular grids */
+void UpdateSimulationGrid( int2 Pos )
+{
+	if( OutsideBounds( Pos ) )
+		return;
+		
+	float Curve;
+	float DampFactor = 1.0f - ( FluidSurfaceFrameParams.FluidOriginDamping.w * FluidSurfaceFrameParams.DeltaTime );
+	float C2T2 = ( FluidSurfaceFrameParams.FluidSpeed * FluidSurfaceFrameParams.DeltaTime ) * ( FluidSurfaceFrameParams.FluidSpeed * FluidSurfaceFrameParams.DeltaTime );
+	float RecipH2 = 1.0f / ( FluidSurfaceParams.FluidGridSpacing * FluidSurfaceParams.FluidGridSpacing );
+	
+	float SH[6];
+	SH[0] = GetVertex( Pos.xy );
+	SH[1] = GetOldVertex( int2( Pos.x - 1, Pos.y     ) );
+	SH[2] = GetOldVertex( int2( Pos.x + 1, Pos.y     ) );
+	SH[3] = GetOldVertex( int2( Pos.x    , Pos.y - 1 ) );
+	SH[4] = GetOldVertex( int2( Pos.x    , Pos.y + 1 ) );
+	SH[5] = GetOldVertex( Pos.xy );
+	
+	Curve = RecipH2 * ( SH[1] + SH[2] + SH[3] + SH[4] - 4 * SH[5] );
+	SetVertex( Pos.xy, ( C2T2 * Curve + ( 2 * SH[5] ) - SH[0] ) * DampFactor );
+}
+
+/** Generates random ripples */
+void RandomNoise( uint2 ThreadId )
+{	
+	float RandSeed = FluidSurfaceFrameParams.Time;
+	uint ThreadNum = ( ThreadId.y * FluidSurfaceParams.FluidXSize ) + ThreadId.x;
+	
+	/** Random noise */
+	int NoisePLings = floor( FluidSurfaceFrameParams.FluidNoiseFrequency * FluidSurfaceFrameParams.DeltaTime );
+	if( ThreadNum < NoisePLings )
+	{
+		int x = ThreadId.x + 1;
+		int y = ThreadId.y + 1;
+		
+		int nX = 1 + ( Rand( float2( RandSeed * x, RandSeed * y ) ) % ( FluidSurfaceParams.FluidXSize - 2 ) );
+		int nY = 1 + ( Rand( float2( ( RandSeed * 2 ) * x, ( RandSeed * 2 ) * y ) ) % ( FluidSurfaceParams.FluidYSize - 2 ) );
+		
+		float Magnitude = ( FRand( float2( ( RandSeed * 4 ) * x, ( RandSeed * 4 ) * y ) ) * FluidSurfaceFrameParams.FluidNoiseStrengthMax );
+		Magnitude += FluidSurfaceFrameParams.FluidNoiseStrengthMin;
+		
+		PlingVertex( int2( nX, nY ), Magnitude );
+	}
+}
+
+/** Update the fluid normals */
+float3 UpdateNormals( int2 ThreadId )
+{
+	float3 Normal = float3( 0.0f, 0.0f, 1.0f );
+	
+	if( OutsideBounds( ThreadId.xy ) )
+		return Normal;
+	
+	float OrigZ, dZ[6];
+	float NormalZ;
+	
+	/** Hex grid */
+	if( FluidSurfaceParams.FluidGridType == 1 )
+	{
+		float dY = 0.866025f * FluidSurfaceParams.FluidGridSpacing;
+		NormalZ = 4.0f * dY * FluidSurfaceParams.FluidGridSpacing;
+		
+		/** Even rows */
+		if( ThreadId.y % 2 == 0 )
+		{
+			OrigZ = GetVertex( ThreadId.xy );
+			dZ[0] = GetOldVertex( int2( ThreadId.x - 1, ThreadId.y     ) ) - OrigZ;
+			dZ[1] = GetOldVertex( int2( ThreadId.x - 1, ThreadId.y + 1 ) ) - OrigZ;
+			dZ[2] = GetOldVertex( int2( ThreadId.x    , ThreadId.y + 1 ) ) - OrigZ;
+			dZ[3] = GetOldVertex( int2( ThreadId.x + 1, ThreadId.y     ) ) - OrigZ;
+			dZ[4] = GetOldVertex( int2( ThreadId.x    , ThreadId.y - 1 ) ) - OrigZ;
+			dZ[5] = GetOldVertex( int2( ThreadId.x - 1, ThreadId.y - 1 ) ) - OrigZ;
+		}
+		
+		/** Odd rows */
+		else
+		{
+			OrigZ = GetVertex( ThreadId.xy );
+			dZ[0] = GetOldVertex( int2( ThreadId.x - 1, ThreadId.y     ) ) - OrigZ;
+			dZ[1] = GetOldVertex( int2( ThreadId.x    , ThreadId.y + 1 ) ) - OrigZ;
+			dZ[2] = GetOldVertex( int2( ThreadId.x + 1, ThreadId.y + 1 ) ) - OrigZ;
+			dZ[3] = GetOldVertex( int2( ThreadId.x + 1, ThreadId.y     ) ) - OrigZ;
+			dZ[4] = GetOldVertex( int2( ThreadId.x + 1, ThreadId.y - 1 ) ) - OrigZ;
+			dZ[5] = GetOldVertex( int2( ThreadId.x    , ThreadId.y - 1 ) ) - OrigZ;
+		}
+		
+		/** Store normal for later */
+		Normal.x = ( 2 * dZ[0] * dY ) - ( 2 * dZ[3] * dY ) + ( dZ[1] * dY ) - ( dZ[2] * dY ) + ( dZ[5] * dY ) - ( dZ[4] * dY );
+		Normal.y = 1.5f * FluidSurfaceParams.FluidGridSpacing * ( -dZ[1] - dZ[2] + dZ[4] + dZ[5] );
+		Normal.z = NormalZ;
+	}
+	
+	/** Rectangle grid */
+	else
+	{
+		NormalZ = 4.0f * ( FluidSurfaceParams.FluidGridSpacing * FluidSurfaceParams.FluidGridSpacing );
+		
+		OrigZ = GetVertex( ThreadId.xy );
+		dZ[0] = GetOldVertex( int2( ThreadId.x - 1, ThreadId.y     ) ) - OrigZ;
+		dZ[1] = GetOldVertex( int2( ThreadId.x    , ThreadId.y + 1 ) ) - OrigZ;
+		dZ[2] = GetOldVertex( int2( ThreadId.x + 1, ThreadId.y     ) ) - OrigZ;
+		dZ[3] = GetOldVertex( int2( ThreadId.x    , ThreadId.y - 1 ) ) - OrigZ;
+		
+		/** Store normal for later */
+		Normal.x = 2.0f * FluidSurfaceParams.FluidGridSpacing * ( dZ[0] - dZ[2] );
+		Normal.y = 2.0f * FluidSurfaceParams.FluidGridSpacing * ( dZ[3] - dZ[1] );
+		Normal.z = NormalZ;
+	}
+	
+	return normalize( Normal );
+}
+
+/** Main entry point */
+
+[numthreads(32,32,1)]
+void ComputeFluidSurface( uint3 ThreadId : SV_DispatchThreadID )
+{
+	/** Generate some turbulence */
+	RandomNoise( ThreadId.xy );
+	
+	/** Sync */
+	AllMemoryBarrier();
+
+	/** Process PLing queue */
+	uint ThreadNum = ( ThreadId.y * FluidSurfaceParams.FluidXSize ) + ThreadId.x;
+	//Pling( int2( ThreadId.xy ), FluidPLingBuffer[ ThreadNum ] );
+	if( ThreadNum < FluidSurfaceFrameParams.NumPLings )
+	{
+		Pling( FluidPLingBuffer[ ThreadNum ] );
+	}
+	
+	/** Sync */
+	AllMemoryBarrier();
+	
+	/** Update the simulation */
+	if( FluidSurfaceParams.FluidGridType == 0 )
+		UpdateSimulationGrid( int2( ThreadId.xy ) );
+	else
+		UpdateSimulationHex( int2( ThreadId.xy ) );
+	
+	/** Store height for later */
+	float Height = FluidSurfaceFrameParams.FluidOriginDamping.z + GetVertex( int2( ThreadId.xy ) );
+	
+	/** Sync */
+	AllMemoryBarrier();
+	
+	/** Update normals */
+	float3 Normal = UpdateNormals( int2( ThreadId.xy ) );
+
+	/** Update fluid surface */
+	OutFluidSurface[ ThreadId.xy ] = float4( Normal.xyz, Height );
+	
+	/* Debug: No height change, only normals */
+	//OutFluidSurface[ ThreadId.xy ] = float4( Normal.xyz, 0.0f );
+}
