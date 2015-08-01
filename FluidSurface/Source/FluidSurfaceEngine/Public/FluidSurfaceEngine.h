@@ -47,7 +47,7 @@ public:
 		VertexBufferRHI = RHICreateVertexBuffer( Vertices.Num( ) * sizeof( FFluidSurfaceVertex ), BUF_Static, CreateInfo );
 
 		void* VertexBufferData = RHILockVertexBuffer( VertexBufferRHI, 0, Vertices.Num( ) * sizeof( FFluidSurfaceVertex ), RLM_WriteOnly );
-		FMemory::Memcpy( VertexBufferData, Vertices.GetTypedData( ), Vertices.Num( ) * sizeof( FFluidSurfaceVertex ) );
+		FMemory::Memcpy( VertexBufferData, Vertices.GetData( ), Vertices.Num( ) * sizeof( FFluidSurfaceVertex ) );
 		RHIUnlockVertexBuffer( VertexBufferRHI );
 
 		Vertices.Empty( );
@@ -67,7 +67,7 @@ public:
 		IndexBufferRHI = RHICreateIndexBuffer( sizeof( int32 ), Indices.Num( ) * sizeof( int32 ), BUF_Static, CreateInfo );
 
 		void* IndexBufferData = RHILockIndexBuffer( IndexBufferRHI, 0, Indices.Num( ) * sizeof( int32 ), RLM_WriteOnly );
-		FMemory::Memcpy( IndexBufferData, Indices.GetTypedData( ), Indices.Num( ) * sizeof( int32 ) );
+		FMemory::Memcpy( IndexBufferData, Indices.GetData( ), Indices.Num( ) * sizeof( int32 ) );
 		RHIUnlockIndexBuffer( IndexBufferRHI );
 
 		Indices.Empty( );

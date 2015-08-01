@@ -32,12 +32,12 @@ public:
 #if WITH_EDITORONLY_DATA
 	// Reference to the billboard component
 	UPROPERTY( )
-	TSubobjectPtr<UBillboardComponent> SpriteComponent;
+	class UBillboardComponent* SpriteComponent;
 #endif
 
 	// Blank scene component
 	UPROPERTY( )
-	TSubobjectPtr<USceneComponent> SceneComponent;
+	class USceneComponent* SceneComponent;
 
 public:
 

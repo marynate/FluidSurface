@@ -3,7 +3,6 @@
 #include "CoreUObject.h"
 #include "Engine.h"
 
-#include "IFluidSurface.h"
 #include "FluidSurfaceEngine.h"
 #include "FluidSurfaceActor.h"
 #include "FluidSurfaceComponent.h"

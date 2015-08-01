@@ -3,41 +3,6 @@
 
 #include "TessellationRendering.h"
 
-/** Copy of function from TessellationRendering.cpp */
-bool RequiresAdjacencyInformation( UMaterialInterface* Material, const FVertexFactoryType* VertexFactoryType )
-{
-	EMaterialTessellationMode TessellationMode = MTM_NoTessellation;
-	bool bEnableCrackFreeDisplacement = false;
-	if( RHISupportsTessellation( GRHIShaderPlatform ) && VertexFactoryType->SupportsTessellationShaders( ) && Material )
-	{
-		if( IsInRenderingThread( ) )
-		{
-			FMaterialRenderProxy* MaterialRenderProxy = Material->GetRenderProxy( false, false );
-			check( MaterialRenderProxy );
-			const FMaterial* MaterialResource = MaterialRenderProxy->GetMaterial( GRHIFeatureLevel );
-			check( MaterialResource );
-			TessellationMode = MaterialResource->GetTessellationMode( );
-			bEnableCrackFreeDisplacement = MaterialResource->IsCrackFreeDisplacementEnabled( );
-		}
-		else if( IsInGameThread( ) )
-		{
-			UMaterial* BaseMaterial = Material->GetMaterial( );
-			check( BaseMaterial );
-			TessellationMode = (EMaterialTessellationMode) BaseMaterial->D3D11TessellationMode;
-			bEnableCrackFreeDisplacement = BaseMaterial->bEnableCrackFreeDisplacement;
-		}
-		else
-		{
-			UMaterialInterface::TMicRecursionGuard RecursionGuard;
-			const UMaterial* BaseMaterial = Material->GetMaterial_Concurrent( RecursionGuard );
-			check( BaseMaterial );
-			TessellationMode = (EMaterialTessellationMode) BaseMaterial->D3D11TessellationMode;
-			bEnableCrackFreeDisplacement = BaseMaterial->bEnableCrackFreeDisplacement;
-		}
-	}
-
-	return TessellationMode == MTM_PNTriangles || ( TessellationMode == MTM_FlatTessellation && bEnableCrackFreeDisplacement );
-}
 
 /** Render Data */
 
@@ -606,7 +571,7 @@ FFluidSurfaceSceneProxy::FFluidSurfaceSceneProxy( UFluidSurfaceComponent* Compon
 	, DynamicData( NULL )
 	, BodySetup( Component->BodySetup )
 	, RenderData( Component->RenderData )
-	, MaterialRelevance( Component->GetMaterialRelevance( GetScene( )->GetFeatureLevel( ) ) )
+	, MaterialRelevance( Component->GetMaterialRelevance( GetScene( ).GetFeatureLevel( ) ) )
 	, Time( 0.0f )
 	, LevelColor( 1,1,1 )
 	, PropertyColor( 1,1,1 )
@@ -621,10 +586,6 @@ FFluidSurfaceSceneProxy::FFluidSurfaceSceneProxy( UFluidSurfaceComponent* Compon
 		Material = UMaterial::GetDefaultMaterial( MD_Surface );
 	}
 
-	FMeshBatchElement& BatchElement = DynamicMesh.Elements[ 0 ];
-	FFluidSurfaceBatchElementParams* BatchElementParams = new FFluidSurfaceBatchElementParams;
-	BatchElementParams->FluidTextureResource = RenderData->FluidTextureResource;
-	BatchElement.UserData = BatchElementParams;
 }
 
 FFluidSurfaceSceneProxy::~FFluidSurfaceSceneProxy( )
@@ -663,20 +624,23 @@ uint32 FFluidSurfaceSceneProxy::GetAllocatedSize( ) const
 }
 
 /** Is the viewport currently in a collision view */
-bool FFluidSurfaceSceneProxy::IsCollisionView( const FSceneView* View, bool& bDrawSimpleCollision, bool& bDrawComplexCollision ) const
+bool FFluidSurfaceSceneProxy::IsCollisionView(const FEngineShowFlags& EngineShowFlags, bool& bDrawSimpleCollision, bool& bDrawComplexCollision) const
 {
-	bDrawSimpleCollision = bDrawComplexCollision = false;
+	bDrawSimpleCollision = false;
+	bDrawComplexCollision = false;
 
-	const bool bInCollisionView = View->Family->EngineShowFlags.CollisionVisibility || View->Family->EngineShowFlags.CollisionPawn;
-	if( bInCollisionView && IsCollisionEnabled( ) )
+	// If in a 'collision view' and collision is enabled
+	const bool bInCollisionView = EngineShowFlags.CollisionVisibility || EngineShowFlags.CollisionPawn;
+	if (bInCollisionView && IsCollisionEnabled())
 	{
-		bool bHasResponse = View->Family->EngineShowFlags.CollisionPawn && CollisionResponse.GetResponse( ECC_Pawn ) != ECR_Ignore;
-		bHasResponse |= View->Family->EngineShowFlags.CollisionVisibility && CollisionResponse.GetResponse( ECC_Visibility ) != ECR_Ignore;
+		// See if we have a response to the interested channel
+		bool bHasResponse = EngineShowFlags.CollisionPawn && (CollisionResponse.GetResponse(ECC_Pawn) != ECR_Ignore);
+		bHasResponse |= EngineShowFlags.CollisionVisibility && (CollisionResponse.GetResponse(ECC_Visibility) != ECR_Ignore);
 
-		if( bHasResponse )
+		if (bHasResponse)
 		{
-			bDrawComplexCollision = View->Family->EngineShowFlags.CollisionVisibility;
-			bDrawSimpleCollision = View->Family->EngineShowFlags.CollisionPawn;
+			bDrawComplexCollision = EngineShowFlags.CollisionVisibility;
+			bDrawSimpleCollision = EngineShowFlags.CollisionPawn;
 		}
 	}
 
@@ -684,139 +648,149 @@ bool FFluidSurfaceSceneProxy::IsCollisionView( const FSceneView* View, bool& bDr
 }
 
 /** Draw mesh */
-void FFluidSurfaceSceneProxy::DrawDynamicElements( FPrimitiveDrawInterface* PDI, const FSceneView* View )
+
+void FFluidSurfaceSceneProxy::GetDynamicMeshElements(const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector) const
 {
-	QUICK_SCOPE_CYCLE_COUNTER( STAT_FluidSurfaceSceneProxy_DrawDynamicElements );
+	QUICK_SCOPE_CYCLE_COUNTER(STAT_FluidSurfaceSceneProxy_GetDynamicMeshElements);
 
-	bool bDrawSimpleCollision = false, bDrawComplexCollision = false;
-	bool bProxyIsSelected = IsSelected( );
-	const bool bInCollisionView = IsCollisionView( View, bDrawSimpleCollision, bDrawComplexCollision );
+	const FEngineShowFlags& EngineShowFlags = ViewFamily.EngineShowFlags;
 
-	const bool bDrawMesh = ( bInCollisionView ) ? ( bDrawComplexCollision ) : true;
+	bool bDrawSimpleCollision = false;
+	bool bDrawComplexCollision = false;
+	const bool bInCollisionView = IsCollisionView(EngineShowFlags, bDrawSimpleCollision, bDrawComplexCollision);
+	const bool bDrawWireframeCollision = EngineShowFlags.Collision && IsCollisionEnabled();
 
-	/* Should draw mesh */
-	if( bDrawMesh )
+	bDrawComplexCollision = bInCollisionView && bDrawComplexCollision && AllowDebugViewmodes();
+
+	const bool bDrawMesh = (bInCollisionView) ? (bDrawComplexCollision) : true;
+	if (bDrawMesh)
 	{
-		/* Check to see if adjacency data is required */
-		const bool bRequiresAdjacencyInformation = RequiresAdjacencyInformation( Material, RenderData->VertexFactory.GetType( ) );
-
-		/* Build render mesh data */
-		FMeshBatchElement& BatchElement = DynamicMesh.Elements[ 0 ];
-		DynamicMesh.bWireframe = false;
-		DynamicMesh.VertexFactory = &RenderData->VertexFactory;
-		DynamicMesh.ReverseCulling = IsLocalToWorldDeterminantNegative( );
-		DynamicMesh.Type = PT_TriangleList;
-		DynamicMesh.DepthPriorityGroup = SDPG_World;
-
-		BatchElement.IndexBuffer = &RenderData->IndexBuffer;
-		BatchElement.PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate( GetLocalToWorld( ), GetBounds( ), GetLocalBounds( ), true, false );
-		BatchElement.FirstIndex = 0;
-		BatchElement.NumPrimitives = RenderData->NumPrimitives;
-		BatchElement.MinVertexIndex = 0;
-		BatchElement.MaxVertexIndex = RenderData->MaxVertexIndex;
-
-		/* Needs adjacency data */
-		if( bRequiresAdjacencyInformation && RenderData->HasTessellationData )
+		for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
 		{
-			/* Use adjacency index buffer instead */
-			DynamicMesh.Type = PT_12_ControlPointPatchList;
-			BatchElement.IndexBuffer = &RenderData->AdjacencyIndexBuffer;
-			BatchElement.FirstIndex *= 4;
-		}
-
-		const bool bIsWireframeView = View->Family->EngineShowFlags.Wireframe;
-
-		/* If wireframe view */
-		if( AllowDebugViewmodes( ) && bIsWireframeView && !View->Family->EngineShowFlags.Materials )
-		{
-			FColoredMaterialRenderProxy WireframeMaterialInstance(
-				GEngine->WireframeMaterial->GetRenderProxy( false ),
-				GetSelectionColor( WireframeColor, !( GIsEditor && View->Family->EngineShowFlags.Selection ) || bProxyIsSelected, IsHovered( ), false )
-				);
-
-			DynamicMesh.bWireframe = true;
-			DynamicMesh.MaterialRenderProxy = &WireframeMaterialInstance;
-
-			/* Draw wireframe mesh */
-			const int32 NumPasses = PDI->DrawMesh( DynamicMesh );
-
-			INC_DWORD_STAT_BY( STAT_FluidSurfaceTriangles, DynamicMesh.GetNumPrimitives( ) * NumPasses );
-		}
-		else
-		{
-			const FLinearColor UtilColor( LevelColor );
-
-			/* If in complex collision view */
-			if( bInCollisionView && bDrawComplexCollision && AllowDebugViewmodes( ) )
+			if (VisibilityMap & (1 << ViewIndex))
 			{
-				const FColoredMaterialRenderProxy CollisionMaterialInstance(
-					GEngine->ShadedLevelColorationUnlitMaterial->GetRenderProxy( bProxyIsSelected, IsHovered( ) ),
-					WireframeColor
-					);
-
-				DynamicMesh.MaterialRenderProxy = &CollisionMaterialInstance;
-
-				/* Draw mesh */
-				const int32 NumPasses = DrawRichMesh(
-					PDI,
-					DynamicMesh,
-					WireframeColor,
-					UtilColor,
-					PropertyColor,
-					this,
-					bProxyIsSelected,
-					bIsWireframeView
-					);
-
-				INC_DWORD_STAT_BY( STAT_FluidSurfaceTriangles, DynamicMesh.GetNumPrimitives( ) * NumPasses );
-			}
-			else
-			{
-				DynamicMesh.MaterialRenderProxy = Material->GetRenderProxy( bProxyIsSelected, IsHovered( ) );
-
-				/* Draw mesh as standard */
-				const int32 NumPasses = DrawRichMesh(
-					PDI,
-					DynamicMesh,
-					WireframeColor,
-					UtilColor,
-					PropertyColor,
-					this,
-					bProxyIsSelected,
-					bIsWireframeView
-					);
-
-				INC_DWORD_STAT_BY( STAT_FluidSurfaceTriangles, DynamicMesh.GetNumPrimitives( ) * NumPasses );
+				const FSceneView* View = Views[ViewIndex];
+				GetDynamicMeshElementsForView(View, ViewIndex, Collector, bDrawComplexCollision);
 			}
 		}
 	}
 
-	/* If in simple collision view */
-	if( ( bDrawSimpleCollision ) && AllowDebugViewmodes( ) )
+	for (int32 ViewIndex = 0; ViewIndex < Views.Num(); ViewIndex++)
 	{
-		if( BodySetup )
+		if (VisibilityMap & (1 << ViewIndex))
 		{
-			if( FMath::Abs( GetLocalToWorld( ).Determinant( ) ) < SMALL_NUMBER )
+			if ((bDrawSimpleCollision || bDrawWireframeCollision) && AllowDebugViewmodes())
 			{
+				const FSceneView* View = Views[ViewIndex];
+				const bool bDrawSolid = !bDrawWireframeCollision;
+				DebugDrawSimpleCollision(View, ViewIndex, Collector, bDrawSolid);
 			}
-			else
-			{
-				const FColoredMaterialRenderProxy SolidMaterialInstance(
-					GEngine->ShadedLevelColorationUnlitMaterial->GetRenderProxy( IsSelected( ), IsHovered( ) ),
-					WireframeColor
-					);
-
-				/* Draw physics body as solid */
-				FTransform GeomTransform( GetLocalToWorld( ) );
-				BodySetup->AggGeom.DrawAggGeom( PDI, GeomTransform, WireframeColor, &SolidMaterialInstance, false, true, false );
-			}
-		}
-	}
 
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
-	/* Render mesh bounds */
-	RenderBounds( PDI, View->Family->EngineShowFlags, GetBounds( ), IsSelected( ) );
+			// Render bounds
+			RenderBounds(Collector.GetPDI(ViewIndex), ViewFamily.EngineShowFlags, GetBounds(), IsSelected());
 #endif
+		}
+	}
+}
+
+void FFluidSurfaceSceneProxy::GetDynamicMeshElementsForView(const FSceneView* View, int32 ViewIndex, FMeshElementCollector& Collector, bool bDrawComplexCollision) const
+{
+	FMaterialRenderProxy* MaterialProxy = Material->GetRenderProxy(IsSelected());
+
+	FMeshBatch& Mesh = Collector.AllocateMesh();
+	Mesh.bCanApplyViewModeOverrides = true;
+	Mesh.bWireframe = false;
+	Mesh.bUseWireframeSelectionColoring = IsSelected();
+
+	const bool bIsWireframeView = AllowDebugViewmodes() && View->Family->EngineShowFlags.Wireframe;
+
+	if (bIsWireframeView)
+	{
+		auto WireframeMaterialInstance = new FColoredMaterialRenderProxy(
+			GEngine->WireframeMaterial ? GEngine->WireframeMaterial->GetRenderProxy(IsSelected()) : NULL,
+			FLinearColor(0, 0.5f, 1.f)
+			);
+
+		Collector.RegisterOneFrameMaterialProxy(WireframeMaterialInstance);
+
+		MaterialProxy = WireframeMaterialInstance;
+
+		Mesh.bWireframe = true;
+		Mesh.bCanApplyViewModeOverrides = false;
+	}
+	else {
+		if (bDrawComplexCollision)
+		{
+			auto CollisionMaterialInstance = new FColoredMaterialRenderProxy(
+				GEngine->ShadedLevelColorationUnlitMaterial->GetRenderProxy(IsSelected(), IsHovered()),
+				WireframeColor
+				);
+			Collector.RegisterOneFrameMaterialProxy(CollisionMaterialInstance);
+			MaterialProxy = CollisionMaterialInstance;
+		}
+	}
+
+	/* Build render mesh data */
+	FMeshBatchElement& BatchElement = Mesh.Elements[0];
+	FFluidSurfaceBatchElementParams* BatchElementParams = new FFluidSurfaceBatchElementParams;
+	BatchElementParams->FluidTextureResource = RenderData->FluidTextureResource;
+	BatchElement.UserData = BatchElementParams;
+	BatchElement.IndexBuffer = &RenderData->IndexBuffer;
+	BatchElement.PrimitiveUniformBuffer = CreatePrimitiveUniformBufferImmediate(GetLocalToWorld(), GetBounds(), GetLocalBounds(), true, false);
+	BatchElement.FirstIndex = 0;
+	BatchElement.NumPrimitives = RenderData->NumPrimitives;
+	BatchElement.MinVertexIndex = 0;
+	BatchElement.MaxVertexIndex = RenderData->MaxVertexIndex;
+
+	Mesh.MaterialRenderProxy = MaterialProxy;
+	Mesh.VertexFactory = &RenderData->VertexFactory;
+	Mesh.ReverseCulling = IsLocalToWorldDeterminantNegative();
+	Mesh.Type = PT_TriangleList;
+	Mesh.DepthPriorityGroup = SDPG_World;
+
+	/* Check to see if adjacency data is required */
+	const bool bRequiresAdjacencyInformation = RequiresAdjacencyInformation(Material, RenderData->VertexFactory.GetType(), GetScene().GetFeatureLevel());
+	
+	/* Needs adjacency data */
+	if (bRequiresAdjacencyInformation && RenderData->HasTessellationData)
+	{
+		/* Use adjacency index buffer instead */
+		Mesh.Type = PT_12_ControlPointPatchList;
+		BatchElement.IndexBuffer = &RenderData->AdjacencyIndexBuffer;
+		BatchElement.FirstIndex *= 4;
+	}
+
+	// Draw the mesh.
+	Collector.AddMesh(ViewIndex, Mesh);
+}
+
+void FFluidSurfaceSceneProxy::DebugDrawSimpleCollision(const FSceneView* View, int32 ViewIndex, FMeshElementCollector& Collector, bool bDrawSolid) const
+{
+	if (!BodySetup)
+		return;
+
+	if (FMath::Abs(GetLocalToWorld().Determinant()) >= SMALL_NUMBER)
+		return;
+
+	FTransform GeomTransform(GetLocalToWorld());
+
+	if (bDrawSolid)
+	{
+		auto SolidMaterialInstance = new FColoredMaterialRenderProxy(
+			GEngine->ShadedLevelColorationUnlitMaterial->GetRenderProxy(IsSelected(), IsHovered()),
+			WireframeColor
+			);
+
+		Collector.RegisterOneFrameMaterialProxy(SolidMaterialInstance);
+
+		BodySetup->AggGeom.GetAggGeom(GeomTransform, WireframeColor, SolidMaterialInstance, false, true, UseEditorDepthTest(), ViewIndex, Collector);
+	}
+	else
+	{
+		const FColor CollisionColor = FColor(157, 149, 223, 255);
+		BodySetup->AggGeom.GetAggGeom(GeomTransform, GetSelectionColor(CollisionColor, IsSelected(), IsHovered()), nullptr, false, false, UseEditorDepthTest(), ViewIndex, Collector);
+	}
 }
 
 /** Prepares and executes compute shader */
@@ -859,7 +833,7 @@ void FFluidSurfaceSceneProxy::ExecComputeShader( )
 	}
 
 	/** Compute shader calculation */
-	TShaderMapRef<FFluidSurfaceCS> FluidSurfaceCS( GetGlobalShaderMap( GetScene( )->GetFeatureLevel( ) ) );
+	TShaderMapRef<FFluidSurfaceCS> FluidSurfaceCS( GetGlobalShaderMap( GetScene( ).GetFeatureLevel( ) ) );
 	RHICmdList.SetComputeShader( FluidSurfaceCS->GetComputeShader( ) );
 
 	/* Set inputs/outputs and dispatch compute shader */

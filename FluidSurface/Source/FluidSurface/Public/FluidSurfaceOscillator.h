@@ -38,7 +38,7 @@ public:
 #if WITH_EDITORONLY_DATA
 	// Reference to the sphere component for radius
 	UPROPERTY( )
-	TSubobjectPtr<class USphereComponent> RadiusComponent;
+	class USphereComponent* RadiusComponent;
 #endif
 
 private:

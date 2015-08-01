@@ -1,15 +1,15 @@
 
 #include "FluidSurfacePrivatePCH.h"
 
-AFluidSurfaceOscillator::AFluidSurfaceOscillator( const class FPostConstructInitializeProperties& PCIP )
-	: Super( PCIP )
+AFluidSurfaceOscillator::AFluidSurfaceOscillator( const class FObjectInitializer& ObjectInitializer )
+	: Super(ObjectInitializer)
 	, Frequency( 1.f )
 	, Phase( 0.f )
 	, Strength( 10.f )
 	, Radius( 0.f )
 {
 #if WITH_EDITORONLY_DATA
-	RadiusComponent = PCIP.CreateEditorOnlyDefaultSubobject<USphereComponent>( this, TEXT( "SphereComponent0" ) );
+	RadiusComponent = CreateEditorOnlyDefaultSubobject<USphereComponent>( TEXT( "SphereComponent0" ) );
 
 	if( !IsRunningCommandlet( ) )
 	{

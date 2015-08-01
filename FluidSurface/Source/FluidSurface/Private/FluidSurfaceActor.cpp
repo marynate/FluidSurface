@@ -1,9 +1,9 @@
 
 #include "FluidSurfacePrivatePCH.h"
 
-AFluidSurfaceActor::AFluidSurfaceActor( const class FPostConstructInitializeProperties& PCIP )
-	: Super( PCIP )
+AFluidSurfaceActor::AFluidSurfaceActor(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
-	FluidSurfaceComponent = PCIP.CreateDefaultSubobject<UFluidSurfaceComponent>( this, TEXT( "FluidSurfaceComponent0" ) );
+	FluidSurfaceComponent = CreateDefaultSubobject<UFluidSurfaceComponent>(TEXT("FluidSurfaceComponent0"));
 	RootComponent = FluidSurfaceComponent;
 }

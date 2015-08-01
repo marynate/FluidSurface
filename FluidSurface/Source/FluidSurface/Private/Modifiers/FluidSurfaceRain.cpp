@@ -1,8 +1,8 @@
 
 #include "FluidSurfacePrivatePCH.h"
 
-AFluidSurfaceRain::AFluidSurfaceRain( const class FPostConstructInitializeProperties& PCIP )
-	: Super( PCIP )
+AFluidSurfaceRain::AFluidSurfaceRain(const class FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	Strength.MinValue = -10.f;
 	Strength.MaxValue = -50.f;

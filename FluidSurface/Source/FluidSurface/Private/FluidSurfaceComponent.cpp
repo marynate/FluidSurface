@@ -18,8 +18,8 @@ inline bool UsingLowDetail( )
 	return ( Ret == 0 );
 }
 
-UFluidSurfaceComponent::UFluidSurfaceComponent( const FPostConstructInitializeProperties& PCIP )
-	: Super( PCIP )
+UFluidSurfaceComponent::UFluidSurfaceComponent(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 {
 	PrimaryComponentTick.bCanEverTick = true;
 	bTickInEditor = true;
@@ -143,7 +143,7 @@ void UFluidSurfaceComponent::Init( )
 	p.Z = FLUIDBOXHEIGHT;
 	FluidBoundingBox += p;
 
-	PLingBuffer.Init( MAX_FLUID_PLINGS );
+	PLingBuffer.SetNumUninitialized(MAX_FLUID_PLINGS);
 	NumPLing = 0;
 
 	if( RenderData )
@@ -241,7 +241,7 @@ void UFluidSurfaceComponent::TickComponent( float DeltaTime, enum ELevelTick Tic
 #endif
 	
 	/* If this water hasn't been rendered for a while, stop updating */
-	if( GetWorld( )->TimeSeconds - LastRenderTime > 1 )
+	if (LastRenderTime > 0 && GetWorld()->TimeSeconds - LastRenderTime > 1)
 		return;
 
 	Time += DeltaTime;
@@ -257,7 +257,7 @@ void UFluidSurfaceComponent::TickComponent( float DeltaTime, enum ELevelTick Tic
 		CollisionShape.SetBox( FluidBoundingBox.GetExtent( ) );
 
 		/* Find overlapping actors */
-		GetWorld( )->OverlapMulti( OverlappingActors, GetComponentLocation( ), GetComponentQuat( ), ECC_WorldDynamic, CollisionShape, FCollisionQueryParams( false ) );
+		GetWorld()->OverlapMultiByChannel(OverlappingActors, GetComponentLocation(), GetComponentQuat(), ECC_WorldDynamic, CollisionShape, FCollisionQueryParams(false));
 
 		// @todo: handle better
 
@@ -354,7 +354,7 @@ void UFluidSurfaceComponent::UpdateBody( )
 	if( BodySetup == NULL )
 	{
 		/* Create physics body */
-		BodySetup = ConstructObject<UBodySetup>( UBodySetup::StaticClass( ), this );
+		BodySetup = NewObject<UBodySetup>(this, UBodySetup::StaticClass());
 	}
 
 	BodySetup->AggGeom.EmptyElements( );

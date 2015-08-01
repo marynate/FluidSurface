@@ -9,5 +9,5 @@ class AFluidSurfaceActor : public AActor
 	GENERATED_UCLASS_BODY( )
 
 	UPROPERTY( Category = FluidSurface, VisibleAnywhere, BlueprintReadOnly )
-	TSubobjectPtr<class UFluidSurfaceComponent> FluidSurfaceComponent;
+	class UFluidSurfaceComponent* FluidSurfaceComponent;
 };

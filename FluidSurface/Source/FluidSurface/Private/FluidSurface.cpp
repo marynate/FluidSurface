@@ -2,7 +2,7 @@
 
 #include "FluidSurfacePrivatePCH.h"
 
-class FFluidSurface : public IFluidSurface
+class FFluidSurface : public IModuleInterface
 {
 	/** IModuleInterface implementation */
 	virtual void StartupModule( ) override;

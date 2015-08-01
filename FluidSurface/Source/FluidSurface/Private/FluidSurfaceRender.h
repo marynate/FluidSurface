@@ -48,7 +48,7 @@ struct FReadBufferStructured
 
 	void Initialize( uint32 BytesPerElement, uint32 NumElements, uint32 AdditionalUsage = 0, bool bUseUavCounter = false, bool bAppendBuffer = false )
 	{
-		check( GRHIFeatureLevel == ERHIFeatureLevel::SM5 );
+		check(GMaxRHIFeatureLevel >= ERHIFeatureLevel::SM5);
 		NumBytes = BytesPerElement * NumElements;
 		FRHIResourceCreateInfo CreateInfo;
 		Buffer = RHICreateStructuredBuffer( BytesPerElement, NumBytes, BUF_ShaderResource | AdditionalUsage, CreateInfo );
@@ -143,7 +143,7 @@ public:
 	virtual bool CanBeOccluded( ) const override;
 	virtual uint32 GetMemoryFootprint( ) const;
 	uint32 GetAllocatedSize( ) const;
-	virtual void DrawDynamicElements( FPrimitiveDrawInterface* PDI, const FSceneView* View );
+	virtual void GetDynamicMeshElements(const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector) const override;
 	/* End UPrimitiveSceneProxy interface */
 
 	/* Set data sent from the game thread */
@@ -152,9 +152,11 @@ public:
 	/* Execute the compute shader */
 	void ExecComputeShader( );
 
+	virtual void DebugDrawSimpleCollision(const FSceneView* View, int32 ViewIndex, FMeshElementCollector& Collector, bool bDrawSolid) const;
 protected:
 
-	bool IsCollisionView( const FSceneView* View, bool& bDrawSimpleCollision, bool& bDrawComplexCollision ) const;
+	virtual void GetDynamicMeshElementsForView(const FSceneView* View, int32 ViewIndex, FMeshElementCollector& Collector, bool bDrawComplexCollision) const;
+	bool IsCollisionView(const FEngineShowFlags& EngineShowFlags, bool& bDrawSimpleCollision, bool& bDrawComplexCollision) const;
 
 public:
 

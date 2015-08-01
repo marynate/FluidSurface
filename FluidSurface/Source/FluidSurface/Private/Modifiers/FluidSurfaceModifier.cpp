@@ -1,16 +1,16 @@
 
 #include "FluidSurfacePrivatePCH.h"
 
-AFluidSurfaceModifier::AFluidSurfaceModifier( const class FPostConstructInitializeProperties& PCIP )
-	: Super( PCIP )
+AFluidSurfaceModifier::AFluidSurfaceModifier(const class FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
 	, FluidActor( NULL )
 	, Active( true )
 {
-	SceneComponent = PCIP.CreateDefaultSubobject<USceneComponent>( this, TEXT( "SceneComponent0" ) );
+	SceneComponent = CreateDefaultSubobject<USceneComponent>(TEXT("SceneComponent0"));
 	RootComponent = SceneComponent;
 
 #if WITH_EDITORONLY_DATA
-	SpriteComponent = PCIP.CreateEditorOnlyDefaultSubobject<UBillboardComponent>( this, TEXT( "Sprite" ) );
+	SpriteComponent = CreateEditorOnlyDefaultSubobject<UBillboardComponent>( TEXT( "Sprite" ) );
 
 	if( !IsRunningCommandlet( ) )
 	{
