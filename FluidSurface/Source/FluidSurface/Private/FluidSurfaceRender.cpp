@@ -49,13 +49,38 @@ void FFluidSurfaceRenderData::InitResources( UFluidSurfaceComponent* Component )
 	FluidTextureResource = RHICreateTexture2D( Component->FluidXSize, Component->FluidYSize, PF_A32B32G32R32F, 1, 1, TexCreate_ShaderResource | TexCreate_UAV, CreateInfo );
 
 	FluidTextureUAV = RHICreateUnorderedAccessView( FluidTextureResource );
+	bVertexInitialized = false;
 
-	/* Intialise fluid buffers */
-	FluidVerts0.Initialize( sizeof( float ), Component->FluidXSize * Component->FluidYSize, PF_R32_FLOAT );
-	FluidVerts1.Initialize( sizeof( float ), Component->FluidXSize * Component->FluidYSize, PF_R32_FLOAT );
+	CachedComponent = Component;
+	UE_LOG(LogTemp, Log, TEXT("Old vertex buffer init..."));
 
-	/* Initialise buffer for storing Plings */
-	FluidPLingBuffer.Initialize( sizeof( FFluidSurfacePLingParameters ), MAX_FLUID_PLINGS, BUF_Volatile );
+
+	ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER(
+		FInitializeFluidVertexBuffers,
+		FRWBuffer&, FluidVerts0, FluidVerts0,
+		FRWBuffer&, FluidVerts1, FluidVerts1,
+		FReadBufferStructured&, FluidPLingBuffer, FluidPLingBuffer,
+		UFluidSurfaceComponent*, Component, Component,
+		{
+			FluidVerts0.Initialize(sizeof(float), Component->FluidXSize * Component->FluidYSize, PF_R32_FLOAT);
+			FluidVerts1.Initialize(sizeof(float), Component->FluidXSize * Component->FluidYSize, PF_R32_FLOAT);
+
+			FluidPLingBuffer.Initialize(sizeof(FFluidSurfacePLingParameters), MAX_FLUID_PLINGS, BUF_Volatile);
+		});
+	
+}
+
+void FFluidSurfaceRenderData::InitVertexBuffer_RenderThread()
+{
+	if (bVertexInitialized) return;
+	
+	UE_LOG(LogTemp, Log, TEXT("New vertex buffer init..."));
+	FluidVerts0.Initialize(sizeof(float), CachedComponent->FluidXSize * CachedComponent->FluidYSize, PF_R32_FLOAT);
+	FluidVerts1.Initialize(sizeof(float), CachedComponent->FluidXSize * CachedComponent->FluidYSize, PF_R32_FLOAT);
+
+	FluidPLingBuffer.Initialize(sizeof(FFluidSurfacePLingParameters), MAX_FLUID_PLINGS, BUF_Volatile);
+
+	bVertexInitialized = true;
 }
 
 /** Release render resources */
@@ -784,12 +809,12 @@ void FFluidSurfaceSceneProxy::DebugDrawSimpleCollision(const FSceneView* View, i
 
 		Collector.RegisterOneFrameMaterialProxy(SolidMaterialInstance);
 
-		BodySetup->AggGeom.GetAggGeom(GeomTransform, WireframeColor, SolidMaterialInstance, false, true, UseEditorDepthTest(), ViewIndex, Collector);
+		BodySetup->AggGeom.GetAggGeom(GeomTransform, WireframeColor.ToFColor(true), SolidMaterialInstance, false, true, UseEditorDepthTest(), ViewIndex, Collector);
 	}
 	else
 	{
 		const FColor CollisionColor = FColor(157, 149, 223, 255);
-		BodySetup->AggGeom.GetAggGeom(GeomTransform, GetSelectionColor(CollisionColor, IsSelected(), IsHovered()), nullptr, false, false, UseEditorDepthTest(), ViewIndex, Collector);
+		BodySetup->AggGeom.GetAggGeom(GeomTransform, GetSelectionColor(CollisionColor, IsSelected(), IsHovered()).ToFColor(true), nullptr, false, false, UseEditorDepthTest(), ViewIndex, Collector);
 	}
 }
 
@@ -863,6 +888,11 @@ void FFluidSurfaceSceneProxy::SetDynamicData_RenderThread( FFluidSurfaceDynamicD
 	Time += DynamicData->DeltaTime;
 	if( Time > 32767.0f )
 		Time = 0.0f;
+
+	if (RenderData != nullptr)
+	{
+		//RenderData->InitVertexBuffer_RenderThread();
+	}
 
 	/* Execute the compute shader */
 	ExecComputeShader( );
