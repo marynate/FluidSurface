@@ -74,6 +74,8 @@ public:
 	/** Initialise required resources */
 	void InitResources( UFluidSurfaceComponent* Component );
 
+	void InitVertexBuffer_RenderThread();
+
 	/** Release any resources */
 	void ReleaseResources( );
 
@@ -125,6 +127,10 @@ public:
 
 	uint32 NumPrimitives;
 	uint32 MaxVertexIndex;
+
+private:
+	UFluidSurfaceComponent* CachedComponent;
+	bool bVertexInitialized;
 };
 
 /** Scene Proxy */
@@ -187,6 +193,7 @@ private:
 	FLinearColor LevelColor;
 	FLinearColor PropertyColor;
 	const FLinearColor WireframeColor;
+	//const FColor WireframeNonLinearColor;
 
 	/** Collision response of this component */
 	FCollisionResponseContainer CollisionResponse;

@@ -1,7 +1,7 @@
 
 #include "FluidSurfacePrivatePCH.h"
 #include "FluidSurfaceRender.h"
-
+#include "PhysicsEngine/BodySetup.h"
 #include "Particles/Emitter.h"
 #include "Particles/ParticleSystemComponent.h"
 
@@ -155,6 +155,7 @@ void UFluidSurfaceComponent::Init( )
 	/* Create render data */
 	RenderData = new FFluidSurfaceRenderData( );
 	RenderData->InitResources( this );
+
 }
 
 /** Pling */
@@ -221,6 +222,20 @@ void UFluidSurfaceComponent::OnRegister( )
 {
 	Super::OnRegister( );
 	Init( );
+}
+
+void UFluidSurfaceComponent::CreateRenderState_Concurrent()
+{
+	Super::CreateRenderState_Concurrent();
+	/*if (RenderData)
+	{
+		RenderData->ReleaseResources();
+		RenderData = NULL;
+	}
+
+	/* Create render data */
+	/*RenderData = new FFluidSurfaceRenderData();
+	RenderData->InitResources(this);*/
 }
 
 /** Tick */
