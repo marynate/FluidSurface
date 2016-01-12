@@ -151,6 +151,8 @@ void UFluidSurfaceComponent::Init( )
 /** Pling */
 void UFluidSurfaceComponent::Pling( const FVector& Position, float Strength, float Radius )
 {
+	if (NumPLing >= MAX_FLUID_PLINGS) return;
+
 	int HitX, HitY;
 	GetNearestIndex( Position, HitX, HitY );
 
