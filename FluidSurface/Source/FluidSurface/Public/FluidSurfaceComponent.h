@@ -61,8 +61,10 @@ class UFluidSurfaceComponent : public UMeshComponent
 
 	/* Begin UActorComponent interface */
 	virtual void OnRegister( ) override;
-	virtual void TickComponent( float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction ) override;
+	virtual void CreateRenderState_Concurrent() override;
 	virtual void SendRenderDynamicData_Concurrent( ) override;
+	virtual void DestroyRenderState_Concurrent() override;
+	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction *ThisTickFunction) override;
 	/* End UActorComponent interface */
 
 	/* Begin UObject interace */

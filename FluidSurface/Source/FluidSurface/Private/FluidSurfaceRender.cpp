@@ -2,7 +2,7 @@
 #include "FluidSurfacePrivatePCH.h"
 
 #include "TessellationRendering.h"
-
+#include "PhysicsEngine/BodySetup.h"
 
 /** Render Data */
 
@@ -50,12 +50,20 @@ void FFluidSurfaceRenderData::InitResources( UFluidSurfaceComponent* Component )
 
 	FluidTextureUAV = RHICreateUnorderedAccessView( FluidTextureResource );
 
-	/* Intialise fluid buffers */
-	FluidVerts0.Initialize( sizeof( float ), Component->FluidXSize * Component->FluidYSize, PF_R32_FLOAT );
-	FluidVerts1.Initialize( sizeof( float ), Component->FluidXSize * Component->FluidYSize, PF_R32_FLOAT );
+	ENQUEUE_UNIQUE_RENDER_COMMAND_FOURPARAMETER(
+		FInitializeFluidVertexBuffers,
+		FRWBuffer&, FluidVerts0, FluidVerts0,
+		FRWBuffer&, FluidVerts1, FluidVerts1,
+		FReadBufferStructured&, FluidPLingBuffer, FluidPLingBuffer,
+		UFluidSurfaceComponent*, Component, Component,
+		{
+			/* Intialise fluid buffers */
+			FluidVerts0.Initialize(sizeof(float), Component->FluidXSize * Component->FluidYSize, PF_R32_FLOAT);
+			FluidVerts1.Initialize(sizeof(float), Component->FluidXSize * Component->FluidYSize, PF_R32_FLOAT);
 
-	/* Initialise buffer for storing Plings */
-	FluidPLingBuffer.Initialize( sizeof( FFluidSurfacePLingParameters ), MAX_FLUID_PLINGS, BUF_Volatile );
+			/* Initialise buffer for storing Plings */
+			FluidPLingBuffer.Initialize(sizeof(FFluidSurfacePLingParameters), MAX_FLUID_PLINGS, BUF_Volatile);
+		});
 }
 
 /** Release render resources */
@@ -784,12 +792,12 @@ void FFluidSurfaceSceneProxy::DebugDrawSimpleCollision(const FSceneView* View, i
 
 		Collector.RegisterOneFrameMaterialProxy(SolidMaterialInstance);
 
-		BodySetup->AggGeom.GetAggGeom(GeomTransform, WireframeColor, SolidMaterialInstance, false, true, UseEditorDepthTest(), ViewIndex, Collector);
+		BodySetup->AggGeom.GetAggGeom(GeomTransform, WireframeColor.ToFColor(true), SolidMaterialInstance, false, true, UseEditorDepthTest(), ViewIndex, Collector);
 	}
 	else
 	{
 		const FColor CollisionColor = FColor(157, 149, 223, 255);
-		BodySetup->AggGeom.GetAggGeom(GeomTransform, GetSelectionColor(CollisionColor, IsSelected(), IsHovered()), nullptr, false, false, UseEditorDepthTest(), ViewIndex, Collector);
+		BodySetup->AggGeom.GetAggGeom(GeomTransform, GetSelectionColor(CollisionColor, IsSelected(), IsHovered()).ToFColor(true), nullptr, false, false, UseEditorDepthTest(), ViewIndex, Collector);
 	}
 }
 

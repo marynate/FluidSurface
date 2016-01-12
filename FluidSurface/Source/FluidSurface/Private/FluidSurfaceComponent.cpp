@@ -4,6 +4,7 @@
 
 #include "Particles/Emitter.h"
 #include "Particles/ParticleSystemComponent.h"
+#include "PhysicsEngine/BodySetup.h"
 
 const double MyU2Rad = ( double ) 0.000095875262;
 
@@ -145,16 +146,6 @@ void UFluidSurfaceComponent::Init( )
 
 	PLingBuffer.SetNumUninitialized(MAX_FLUID_PLINGS);
 	NumPLing = 0;
-
-	if( RenderData )
-	{
-		RenderData->ReleaseResources( );
-		RenderData = NULL;
-	}
-	
-	/* Create render data */
-	RenderData = new FFluidSurfaceRenderData( );
-	RenderData->InitResources( this );
 }
 
 /** Pling */
@@ -221,6 +212,27 @@ void UFluidSurfaceComponent::OnRegister( )
 {
 	Super::OnRegister( );
 	Init( );
+}
+
+void UFluidSurfaceComponent::CreateRenderState_Concurrent()
+{
+	/* Create render data */
+	RenderData = new FFluidSurfaceRenderData();
+	RenderData->InitResources(this);
+
+	Super::CreateRenderState_Concurrent();
+}
+
+void UFluidSurfaceComponent::DestroyRenderState_Concurrent()
+{
+	Super::DestroyRenderState_Concurrent();
+
+	if (RenderData)
+	{
+		RenderData->ReleaseResources();
+		//BeginCleanup(RenderData);
+		RenderData = NULL;
+	}
 }
 
 /** Tick */
@@ -432,8 +444,6 @@ FColor UFluidSurfaceComponent::GetWireframeColor( ) const
 void UFluidSurfaceComponent::BeginDestroy( )
 {
 	Super::BeginDestroy( );
-	if( RenderData )
-		RenderData->ReleaseResources( );
 }
 
 void UFluidSurfaceComponent::CreatePhysicsState( )
