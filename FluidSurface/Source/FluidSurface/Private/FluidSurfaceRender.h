@@ -1,6 +1,13 @@
 
 #pragma once
 
+#include "FluidSurfaceEngine.h"
+
+#include "TessellationRendering.h"
+#include "PhysicsEngine/BodySetup.h"
+
+#include "FluidSurfaceActor.h"
+
 #define MAX_FLUID_PLINGS 1024
 
 /** PLing Parameters */
@@ -67,9 +74,7 @@ struct FReadBufferStructured
 class FFluidSurfaceRenderData
 {
 public:
-
-	/** Default constructor */
-	FFluidSurfaceRenderData( );
+	FFluidSurfaceRenderData( ) { }
 
 	/** Initialise required resources */
 	void InitResources( UFluidSurfaceComponent* Component );
@@ -139,11 +144,11 @@ public:
 	virtual ~FFluidSurfaceSceneProxy( );
 
 	/* Begin UPrimitiveSceneProxy interface */
+	virtual SIZE_T GetTypeHash( ) const override;
 	virtual FPrimitiveViewRelevance GetViewRelevance( const FSceneView* View );
-	virtual bool CanBeOccluded( ) const override;
 	virtual uint32 GetMemoryFootprint( ) const;
 	uint32 GetAllocatedSize( ) const;
-	virtual void GetDynamicMeshElements(const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector) const override;
+	virtual void GetDynamicMeshElements( const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector ) const override;
 	/* End UPrimitiveSceneProxy interface */
 
 	/* Set data sent from the game thread */

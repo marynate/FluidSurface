@@ -1,17 +1,8 @@
 // Copyright 1998-2014 Epic Games, Inc. All Rights Reserved.
 
-#include "FluidSurfacePrivatePCH.h"
-
-class FFluidSurface : public IModuleInterface
-{
-	/** IModuleInterface implementation */
-	virtual void StartupModule( ) override;
-	virtual void ShutdownModule( ) override;
-};
+#include "FluidSurface.h"
 
 IMPLEMENT_MODULE( FFluidSurface, FluidSurface )
-
-
 
 void FFluidSurface::StartupModule()
 {
@@ -24,6 +15,3 @@ void FFluidSurface::ShutdownModule()
 	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
 	// we call this function before unloading the module.
 }
-
-
-

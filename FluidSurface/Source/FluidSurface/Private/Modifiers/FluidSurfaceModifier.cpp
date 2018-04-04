@@ -1,5 +1,7 @@
 
-#include "FluidSurfacePrivatePCH.h"
+#include "FluidSurfaceModifier.h"
+
+#include "Components/BillboardComponent.h"
 
 AFluidSurfaceModifier::AFluidSurfaceModifier(const class FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -28,7 +30,7 @@ AFluidSurfaceModifier::AFluidSurfaceModifier(const class FObjectInitializer& Obj
 			static FConstructorStatics ConstructorStatics;
 
 			SpriteComponent->Sprite = ConstructorStatics.TextRenderTexture.Get( );
-			SpriteComponent->AttachParent = SceneComponent;
+			SpriteComponent->SetupAttachment( SceneComponent );
 			SpriteComponent->bIsScreenSizeScaled = true;
 			SpriteComponent->bAbsoluteScale = true;
 			SpriteComponent->bReceivesDecals = false;

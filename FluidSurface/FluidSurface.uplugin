@@ -1,16 +1,14 @@
 {
-    "PluginFileVersion" : 3,
-	
+	"FileVersion" : 3,
+	"Version" : 1,
 	"FriendlyName" : "Fluid Surface Actor",
 	"Version" : 10,
 	"VersionName" : "0.1.3",
 	"CreatedBy" : "Ehamloptiran",
 	"CreatedByURL" : "galaxyeham@gmail.com",
-	"EngineVersion" : "4.10.0",
 	"Description" : "Simulated fluid surface actor",
 	"Category" : "Rendering",
 	"EnabledByDefault" : true,
-	
     "Modules" :
 	[
 		{
@@ -20,7 +18,7 @@
 		{
 			"Name" : "FluidSurfaceEngine",
 			"Type" : "Runtime",
-			"LoadingPhase" : "PostConfigInit"
+			"LoadingPhase": "PostConfigInit"
 		}
 	]
 }

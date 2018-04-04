@@ -1,15 +1,36 @@
 
-#include "FluidSurfacePrivatePCH.h"
+#include "FluidSurfaceRender.h"
 
-#include "TessellationRendering.h"
-#include "PhysicsEngine/BodySetup.h"
+#include "EngineGlobals.h"
+#include "RHI.h"
+#include "RenderResource.h"
+#include "RenderingThread.h"
+#include "VertexFactory.h"
+#include "PackedNormal.h"
+#include "LocalVertexFactory.h"
+#include "PrimitiveViewRelevance.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "PrimitiveSceneProxy.h"
+#include "Engine/CollisionProfile.h"
+#include "Curves/CurveFloat.h"
+#include "SceneManagement.h"
+#include "Engine/Engine.h"
+#include "Engine/LevelStreaming.h"
+#include "LevelUtils.h"
+#include "ShowFlags.h"
+#include "Camera/CameraTypes.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/SceneCapture2D.h"
+#include "Engine/Texture2DDynamic.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "DynamicMeshBuilder.h"
+#include "Components/SceneCaptureComponent2D.h"
+#include "StaticMeshResources.h"
+
+#include "FluidSurfaceComponent.h"
 
 /** Render Data */
-
-FFluidSurfaceRenderData::FFluidSurfaceRenderData(  )
-	: HasTessellationData( false )
-{
-}
 
 /** Initialise render resources */
 void FFluidSurfaceRenderData::InitResources( UFluidSurfaceComponent* Component )
@@ -578,7 +599,7 @@ FFluidSurfaceSceneProxy::FFluidSurfaceSceneProxy( UFluidSurfaceComponent* Compon
 	, Material( NULL )
 	, DynamicData( NULL )
 	, BodySetup( Component->BodySetup )
-	, RenderData( Component->RenderData )
+	, RenderData( Component->RenderData.Get( ) )
 	, MaterialRelevance( Component->GetMaterialRelevance( GetScene( ).GetFeatureLevel( ) ) )
 	, Time( 0.0f )
 	, LevelColor( 1,1,1 )
@@ -601,6 +622,12 @@ FFluidSurfaceSceneProxy::~FFluidSurfaceSceneProxy( )
 	if( DynamicData != NULL ) { delete DynamicData; }
 }
 
+SIZE_T FFluidSurfaceSceneProxy::GetTypeHash( ) const
+{
+	static size_t UniquePointer;
+	return reinterpret_cast< size_t >( &UniquePointer );
+}
+
 /** Returns the view revelance */
 FPrimitiveViewRelevance FFluidSurfaceSceneProxy::GetViewRelevance( const FSceneView* View )
 {
@@ -611,12 +638,6 @@ FPrimitiveViewRelevance FFluidSurfaceSceneProxy::GetViewRelevance( const FSceneV
 	MaterialRelevance.SetPrimitiveViewRelevance( Result );
 
 	return Result;
-}
-
-/** Can mesh be occluded */
-bool FFluidSurfaceSceneProxy::CanBeOccluded( ) const
-{
-	return !MaterialRelevance.bDisableDepthTest;
 }
 
 /** Memory footprint */

@@ -4,8 +4,8 @@
 	FluidSurfaceVertexFactory.usf: Local vertex factory shader code.
 =============================================================================*/
 
-#include "VertexFactoryCommon.usf"
-#include "FluidSurfaceVertexFactoryCommon.usf"
+#include "VertexFactoryCommon.ush"
+#include "FluidSurfaceVertexFactoryCommon.ush"
 
 #if USE_FLUIDSURFACE
 Texture2D FluidTexture;

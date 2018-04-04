@@ -1,5 +1,6 @@
 
-#include "FluidSurfacePrivatePCH.h"
+#include "FluidSurfaceOscillator.h"
+
 
 AFluidSurfaceOscillator::AFluidSurfaceOscillator( const class FObjectInitializer& ObjectInitializer )
 	: Super(ObjectInitializer)
@@ -15,7 +16,7 @@ AFluidSurfaceOscillator::AFluidSurfaceOscillator( const class FObjectInitializer
 	{
 		if( RadiusComponent != nullptr )
 		{
-			RadiusComponent->AttachParent = SceneComponent;
+			RadiusComponent->SetupAttachment( SceneComponent );
 			RadiusComponent->SetSphereRadius( Radius );
 		}
 	}
