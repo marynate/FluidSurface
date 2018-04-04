@@ -1,12 +1,27 @@
 
 #pragma once
 
+#include "ModuleManager.h"
+
+#include "Shader.h"
 #include "GlobalShader.h"
 #include "UniformBuffer.h"
+#include "SimpleElementShaders.h"
+#include "ShaderParameterUtils.h"
+#include "PipelineStateCache.h"
 #include "RHICommandList.h"
+
+#include "VertexFactory.h"
+#include "LocalVertexFactory.h"
 
 DECLARE_DWORD_COUNTER_STAT_EXTERN( TEXT( "Fluid Surface Tris" ), STAT_FluidSurfaceTriangles, STATGROUP_Engine, FLUIDSURFACEENGINE_API );
 
+class FFluidSurfaceEngine : public IModuleInterface
+{
+	/** IModuleInterface implementation */
+	virtual void StartupModule( ) override;
+	virtual void ShutdownModule( ) override;
+};
 
 /** Vertex */
 struct FFluidSurfaceVertex
@@ -113,7 +128,14 @@ class FLUIDSURFACEENGINE_API FFluidSurfaceVertexFactory : public FLocalVertexFac
 public:
 
 	/** Default constructor */
-	FFluidSurfaceVertexFactory( ) {}
+	FFluidSurfaceVertexFactory( )
+	: FLocalVertexFactory( ERHIFeatureLevel::SM4, "FluidSurfaceVertexFactory", nullptr )
+	{}
+
+	/** Default constructor */
+	FFluidSurfaceVertexFactory( ERHIFeatureLevel::Type InFeatureLevel, const char* InDebugName, const FStaticMeshDataType* InStaticMeshDataType = nullptr )
+	: FLocalVertexFactory( InFeatureLevel, InDebugName, InStaticMeshDataType )
+	{}
 
 	/** Initialization */
 	void Init( const FFluidSurfaceVertexBuffer* VertexBuffer );
@@ -176,8 +198,13 @@ public:
 	/** Cache only when using SM5 */
 	static bool ShouldCache( EShaderPlatform Platform ) { return IsFeatureLevelSupported( Platform, ERHIFeatureLevel::SM5 ); }
 
+	static bool ShouldCompilePermutation( const FGlobalShaderPermutationParameters& Parameters )
+	{
+		return IsFeatureLevelSupported( Parameters.Platform, ERHIFeatureLevel::SM4 );
+	}
+
 	/** Modify compilation environment */
-	static void ModifyCompilationEnvironment( EShaderPlatform Platform, FShaderCompilerEnvironment& OutEnvironment );
+	static void ModifyCompilationEnvironment( const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment );
 
 	/** Serialization */
 	virtual bool Serialize( FArchive& Ar ) override

@@ -1,8 +1,25 @@
 
-#include "FluidSurfaceEnginePrivatePCH.h"
+#include "FluidSurfaceEngine.h"
 
 #include "ShaderParameterUtils.h"
 #include "RHIStaticStates.h"
+
+/** Fluid Surface triangles stat */
+DEFINE_STAT( STAT_FluidSurfaceTriangles );
+
+IMPLEMENT_MODULE( FFluidSurfaceEngine, FluidSurfaceEngine )
+
+void FFluidSurfaceEngine::StartupModule( )
+{
+	// This code will execute after your module is loaded into memory (but after global variables are initialized, of course.)
+}
+
+
+void FFluidSurfaceEngine::ShutdownModule( )
+{
+	// This function may be called during shutdown to clean up your module.  For modules that support dynamic reloading,
+	// we call this function before unloading the module.
+}
 
 IMPLEMENT_UNIFORM_BUFFER_STRUCT( FFluidSurfaceParameters, TEXT( "FluidSurfaceParams" ) )
 IMPLEMENT_UNIFORM_BUFFER_STRUCT( FFluidSurfaceFrameParameters, TEXT( "FluidSurfaceFrameParams" ) )
@@ -51,13 +68,11 @@ void FFluidSurfaceVertexFactoryShaderParameters::SetMesh( FRHICommandList& RHICm
 	}
 }
 
-/** Vertex Factory */
-
 void FFluidSurfaceVertexFactory::Init( const FFluidSurfaceVertexBuffer* VertexBuffer )
 {
 	if( IsInRenderingThread( ) )
 	{
-		DataType NewData;
+		FDataType NewData;
 		NewData.PositionComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT( VertexBuffer, FFluidSurfaceVertex, Position, VET_Float3 );
 		NewData.TextureCoordinates.Add( FVertexStreamComponent( VertexBuffer, STRUCT_OFFSET( FFluidSurfaceVertex, TextureCoordinate ), sizeof( FFluidSurfaceVertex ), VET_Float2 ) );
 		NewData.TangentBasisComponents[ 0 ] = STRUCTMEMBER_VERTEXSTREAMCOMPONENT( VertexBuffer, FFluidSurfaceVertex, Tangent, VET_Float3 );
@@ -73,7 +88,7 @@ void FFluidSurfaceVertexFactory::Init( const FFluidSurfaceVertexBuffer* VertexBu
 			const FFluidSurfaceVertexBuffer*, VertexBuffer, VertexBuffer,
 			{
 			// Initialize the vertex factory's stream components
-			DataType NewData;
+			FDataType NewData;
 			NewData.PositionComponent = STRUCTMEMBER_VERTEXSTREAMCOMPONENT( VertexBuffer, FFluidSurfaceVertex, Position, VET_Float3 );
 			NewData.TextureCoordinates.Add( FVertexStreamComponent( VertexBuffer, STRUCT_OFFSET( FFluidSurfaceVertex, TextureCoordinate ), sizeof( FFluidSurfaceVertex ), VET_Float2 ) );
 			NewData.TangentBasisComponents[ 0 ] = STRUCTMEMBER_VERTEXSTREAMCOMPONENT( VertexBuffer, FFluidSurfaceVertex, Tangent, VET_Float3 );
@@ -101,7 +116,7 @@ void FFluidSurfaceVertexFactory::Copy( const FFluidSurfaceVertexFactory& Other )
 	ENQUEUE_UNIQUE_RENDER_COMMAND_TWOPARAMETER(
 		FFluidSurfaceVertexFactoryCopyData,
 		FFluidSurfaceVertexFactory*, VertexFactory, this,
-		const DataType*, DataCopy, &Other.Data,
+		const FDataType*, DataCopy, &Other.Data,
 		{
 		VertexFactory->Data = *DataCopy;
 	} );
@@ -117,8 +132,7 @@ FVertexFactoryShaderParameters* FFluidSurfaceVertexFactory::ConstructShaderParam
 	return NULL;
 }
 
-IMPLEMENT_VERTEX_FACTORY_TYPE( FFluidSurfaceVertexFactory, "FluidSurfaceVertexFactory", true, true, true, true, false );
-
+IMPLEMENT_VERTEX_FACTORY_TYPE( FFluidSurfaceVertexFactory, "/Engine/Private/FluidSurfaceVertexFactory.ush", true, true, true, true, false );
 /** Compute Shader */
 
 FFluidSurfaceCS::FFluidSurfaceCS( const ShaderMetaType::CompiledShaderInitializerType& Initializer )
@@ -131,9 +145,9 @@ FFluidSurfaceCS::FFluidSurfaceCS( const ShaderMetaType::CompiledShaderInitialize
 }
 
 /* Sets flags to use during compilation of this shader */
-void FFluidSurfaceCS::ModifyCompilationEnvironment( EShaderPlatform Platform, FShaderCompilerEnvironment& OutEnvironment )
+void FFluidSurfaceCS::ModifyCompilationEnvironment( const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment )
 {
-	FGlobalShader::ModifyCompilationEnvironment( Platform, OutEnvironment );
+	FGlobalShader::ModifyCompilationEnvironment( Parameters, OutEnvironment );
 	OutEnvironment.CompilerFlags.Add( CFLAG_StandardOptimization );
 }
 
@@ -194,10 +208,4 @@ void FFluidSurfaceCS::UnbindBuffers( FRHICommandList& RHICmdList )
 		RHICmdList.SetShaderResourceViewParameter( ComputeShaderRHI, InFluidPLingBuffer.GetBaseIndex( ), FShaderResourceViewRHIRef( ) );
 }
 
-IMPLEMENT_SHADER_TYPE( , FFluidSurfaceCS, TEXT( "FluidSurfaceShader" ), TEXT( "ComputeFluidSurface" ), SF_Compute );
-
-/** Fluid Surface triangles stat */
-DEFINE_STAT( STAT_FluidSurfaceTriangles );
-
-class FFluidSurfaceEngine : public FDefaultModuleImpl {};
-IMPLEMENT_MODULE(FFluidSurfaceEngine, FluidSurfaceEngine)
+IMPLEMENT_SHADER_TYPE( , FFluidSurfaceCS, TEXT( "/Engine/Private/FluidSurfaceShader.usf" ), TEXT( "ComputeFluidSurface" ), SF_Compute );

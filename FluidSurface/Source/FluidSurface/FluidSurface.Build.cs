@@ -1,36 +1,34 @@
-// Copyright 1998-2014 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+using UnrealBuildTool;
 
-namespace UnrealBuildTool.Rules
+public class FluidSurface : ModuleRules
 {
-	public class FluidSurface : ModuleRules
+	public FluidSurface(ReadOnlyTargetRules Target) : base(Target)
 	{
-		public FluidSurface(TargetInfo Target)
-		{
-			PrivateIncludePaths.AddRange(
-				new string[] {
-					"FluidSurface/Private",
-                    "FluidSurface/Private/Modifiers"
-				}
-				);
+		PrivateIncludePaths.AddRange(
+			new string[] {
+				"FluidSurface/Private",
+				"FluidSurface/Private/Modifiers"
+			}
+			);
 
-            PublicIncludePaths.AddRange(
-                new string[] {
-                    "FluidSurfaceRender/Public"
-                }
-                );
+		PublicIncludePaths.AddRange(
+			new string[] {
+				"FluidSurfaceRender/Public"
+			}
+			);
 
-			PublicDependencyModuleNames.AddRange(
-				new string[]
-				{
-					"Core",
-					"CoreUObject",
-                    "Engine",
-                    "RenderCore",
-                    "ShaderCore",
-                    "RHI",
-                    "FluidSurfaceEngine"
-				}
-				);
-		}
+		PublicDependencyModuleNames.AddRange(
+			new string[]
+			{
+				"Core",
+				"CoreUObject",
+				"Engine",
+				"RenderCore",
+				"ShaderCore",
+				"RHI",
+				"FluidSurfaceEngine"
+			}
+			);
 	}
 }

@@ -1,5 +1,5 @@
+#include "FluidSurfaceRain.h"
 
-#include "FluidSurfacePrivatePCH.h"
 
 AFluidSurfaceRain::AFluidSurfaceRain(const class FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)

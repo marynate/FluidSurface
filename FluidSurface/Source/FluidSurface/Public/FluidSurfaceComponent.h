@@ -1,42 +1,19 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
+#include "UObject/ObjectMacros.h"
+
+#include "GameFramework/Actor.h"
+
+#include "Components/MeshComponent.h"
+
+#include "FluidSurfaceRender.h"
+
 #include "FluidSurfaceComponent.generated.h"
 
 #define ROOT3OVER2			(0.866025f)
 #define FLUIDBOXHEIGHT		(5)
-
-UENUM( )
-namespace EFluidGridType
-{
-	enum Type
-	{
-		FGT_Square		= 0,
-		FGT_Hexagonal	= 1,
-		FGT_MAX			= 2,
-	};
-}
-
-/** Stores a range of values */
-USTRUCT( BlueprintType )
-struct FRangedValues
-{
-	GENERATED_USTRUCT_BODY( );
-
-	/** Minimum value of range */
-	UPROPERTY( EditAnywhere, BlueprintReadWrite, Category = "Range" )
-		float MinValue;
-
-	/** Maximum value of range */
-	UPROPERTY( EditAnywhere, BlueprintReadWrite, Category = "Range" )
-		float MaxValue;
-
-	/** Get a random number from within the range */
-	float GetRand( )
-	{
-		return FMath::FRandRange( MinValue, MaxValue );
-	}
-};
 
 UCLASS( ClassGroup = ( Rendering, Common ), HideCategories = ( Object, LOD, Physics, Activation, "Components|Activation" ), EditInLineNew, Meta = ( BlueprintSpawnableComponent ), ClassGroup = Rendering )
 class UFluidSurfaceComponent : public UMeshComponent
@@ -47,7 +24,6 @@ class UFluidSurfaceComponent : public UMeshComponent
 	virtual FPrimitiveSceneProxy* CreateSceneProxy( ) override;
 	virtual class UBodySetup* GetBodySetup( ) override;
 	virtual void ReceiveComponentDamage( float DamageAmount, FDamageEvent const& DamageEvent, AController* EventInstigator, AActor* DamageCauser ) override;
-	virtual void CreatePhysicsState( ) override;
 	/* End UPrimitiveComponent interface*/
 
 	/* Begin UMeshComponent interface */
@@ -77,7 +53,7 @@ class UFluidSurfaceComponent : public UMeshComponent
 
 	/* Delegates */
 	UFUNCTION( )
-	void ComponentTouched( AActor* Other, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult );
+	void ComponentBeginOverlap( UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult  );
 
 	/** Color to use when displayed in wireframe */
 	FColor GetWireframeColor( ) const;
@@ -206,7 +182,7 @@ public:
 	int NumPLing;
 
 	/** Render data */
-	TScopedPointer<class FFluidSurfaceRenderData> RenderData;
+	TUniquePtr< class FFluidSurfaceRenderData > RenderData;
 
 	/** Bounding box of the fluid surface */
 	FBox FluidBoundingBox;
@@ -239,9 +215,6 @@ private:
 
 	/* Update the physics body */
 	void UpdateBody( );
-
-	/* Get World to Component transform */
-	FORCEINLINE FTransform GetWorldToComponent( ) const { return FTransform( ComponentToWorld.ToMatrixWithScale( ).Inverse( ) ); }
 
 	/* Create the dynamic data that is sent to the render thread */
 	struct FFluidSurfaceDynamicData* CreateDynamicData( );

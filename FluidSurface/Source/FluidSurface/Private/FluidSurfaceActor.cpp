@@ -1,5 +1,7 @@
 
-#include "FluidSurfacePrivatePCH.h"
+#include "FluidSurfaceActor.h"
+
+#include "FluidSurfaceComponent.h"
 
 AFluidSurfaceActor::AFluidSurfaceActor(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)

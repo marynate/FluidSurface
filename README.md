@@ -14,6 +14,8 @@ Installation
 Version History
 ---------------
 
+__0.1.4-dev__ Very _rough_ update from [Trent Polack](https://github.com/trentpolack) to bring the plugin up to UE 4.19 building/deployment standards (still needs shader work): https://github.com/trentpolack/FluidSurface
+
 __0.1.3__ Update for 4.10 base on DamirH's modification
 
 __0.1.2__ Update for 4.8
