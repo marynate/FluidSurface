@@ -2,11 +2,11 @@
 #pragma once
 
 #include "FluidSurfaceEngine.h"
+#include "FluidSurfaceActor.h"
 
 #include "TessellationRendering.h"
 #include "PhysicsEngine/BodySetup.h"
-
-#include "FluidSurfaceActor.h"
+#include "PrimitiveSceneProxy.h"
 
 #define MAX_FLUID_PLINGS 1024
 
@@ -144,8 +144,7 @@ public:
 	virtual ~FFluidSurfaceSceneProxy( );
 
 	/* Begin UPrimitiveSceneProxy interface */
-	virtual SIZE_T GetTypeHash( ) const override;
-	virtual FPrimitiveViewRelevance GetViewRelevance( const FSceneView* View );
+	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) const override;
 	virtual uint32 GetMemoryFootprint( ) const;
 	uint32 GetAllocatedSize( ) const;
 	virtual void GetDynamicMeshElements( const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector ) const override;

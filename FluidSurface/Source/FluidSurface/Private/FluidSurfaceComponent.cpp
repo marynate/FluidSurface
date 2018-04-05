@@ -70,28 +70,31 @@ void UFluidSurfaceComponent::PostEditChangeProperty( FPropertyChangedEvent& Prop
 {
 	Super::PostEditChangeProperty( PropertyChangedEvent );
 
-	//if( PropertyChangedEvent.Property )
-	//{
-	//	const FName PropertyName = ( PropertyChangedEvent.Property != NULL ) ? PropertyChangedEvent.Property->GetFName( ) : NAME_None;
+	if( PropertyChangedEvent.Property != NULL)
+	{
+		const FName PropertyName = PropertyChangedEvent.Property->GetFName( );
 
-	//	/* Update the physics body if any properties involving grid shape are changed */
-	//	if( PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, FluidGridType )
-	//		|| PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, FluidGridSpacing )
-	//		|| PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, FluidXSize )
-	//		|| PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, FluidYSize )
-	//		|| PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, BuildTessellationData ) )
-	//	{
-	//		if( RenderData )
-	//		{
-	//			/* Update render data */
-	//			RenderData->ReleaseResources( );
-	//			RenderData->InitResources( this );
-	//		}
+		/* Update the physics body if any properties involving grid shape are changed */
+		if( PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, FluidGridType )
+			|| PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, FluidGridSpacing )
+			|| PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, FluidXSize )
+			|| PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, FluidYSize )
+			|| PropertyName == GET_MEMBER_NAME_CHECKED( UFluidSurfaceComponent, BuildTessellationData ) )
+		{
+			if (RenderData)
+			{
+				RenderData->ReleaseResources();
+				RenderData = NULL;
+			}
 
-	//		/* Update physics */
-	//		UpdateBody( );
-	//	}
-	//}
+			/* Create render data */
+			RenderData = MakeUnique<FFluidSurfaceRenderData>();
+			RenderData->InitResources(this);
+
+			/* Update physics */
+			UpdateBody( );
+		}
+	}
 }
 #endif
 
@@ -149,6 +152,16 @@ void UFluidSurfaceComponent::Init( )
 
 	PLingBuffer.SetNumUninitialized(MAX_FLUID_PLINGS);
 	NumPLing = 0;
+
+	if (RenderData)
+	{
+		RenderData->ReleaseResources();
+		RenderData = NULL;
+	}
+	
+	/* Create render data */
+	RenderData = MakeUnique<FFluidSurfaceRenderData>();
+	RenderData->InitResources(this);
 }
 
 /** Pling */
@@ -159,7 +172,7 @@ void UFluidSurfaceComponent::Pling( const FVector& Position, float Strength, flo
 	int HitX, HitY;
 	GetNearestIndex( Position, HitX, HitY );
 
-	PLingBuffer[ NumPLing ].LocalHitPosition = GetComponentTransform( ).Inverse( ).TransformPosition( Position );
+	PLingBuffer[ NumPLing ].LocalHitPosition = GetComponentTransform().TransformPosition( Position );
 	
 	PLingBuffer[ NumPLing ].HitX = HitX;
 	PLingBuffer[ NumPLing ].HitY = HitY;
@@ -172,7 +185,7 @@ void UFluidSurfaceComponent::Pling( const FVector& Position, float Strength, flo
 /** Get nearest index */
 void UFluidSurfaceComponent::GetNearestIndex( const FVector& Pos, int& xIndex, int& yIndex )
 {
-	FVector LocalPos = GetComponentTransform( ).Inverse( ).TransformPosition( Pos );
+	FVector LocalPos = GetComponentTransform().TransformPosition( Pos );
 
 	xIndex = FMath::RoundToInt( ( LocalPos.X - FluidOrigin.X ) / FluidGridSpacing );
 	xIndex = FMath::Clamp( xIndex, 0, FluidXSize - 1 );
@@ -216,14 +229,20 @@ FBoxSphereBounds UFluidSurfaceComponent::CalcBounds( const FTransform& LocalToWo
 /** On Register */
 void UFluidSurfaceComponent::OnRegister( )
 {
-	Super::OnRegister( );
-	Init( );
+	Super::OnRegister();
+	Init();
 }
 
 void UFluidSurfaceComponent::CreateRenderState_Concurrent()
 {
+	if (RenderData)
+	{
+		RenderData->ReleaseResources();
+		RenderData = NULL;
+	}
+
 	/* Create render data */
-	RenderData = MakeUnique< FFluidSurfaceRenderData >( );
+	RenderData = MakeUnique<FFluidSurfaceRenderData>();
 	RenderData->InitResources(this);
 
 	Super::CreateRenderState_Concurrent();
@@ -275,7 +294,8 @@ void UFluidSurfaceComponent::TickComponent( float DeltaTime, enum ELevelTick Tic
 		CollisionShape.SetBox( FluidBoundingBox.GetExtent( ) );
 
 		/* Find overlapping actors */
-		GetWorld()->OverlapMultiByChannel(OverlappingActors, GetComponentLocation(), GetComponentQuat(), ECC_WorldDynamic, CollisionShape, FCollisionQueryParams(false));
+		FCollisionQueryParams Params; 
+		GetWorld()->OverlapMultiByChannel(OverlappingActors, GetComponentLocation(), GetComponentQuat(), ECC_WorldDynamic, CollisionShape, Params);
 
 		// @todo: handle better
 
@@ -287,7 +307,7 @@ void UFluidSurfaceComponent::TickComponent( float DeltaTime, enum ELevelTick Tic
 			/* Dont care about self and modifiers */
 			if( Actor != NULL && !Actor->IsA( AFluidSurfaceActor::StaticClass( ) ) && !Actor->IsA( AFluidSurfaceModifier::StaticClass( ) ) )
 			{
-				FVector LocalVel = GetComponentTransform( ).Inverse( ).TransformVector( Actor->GetVelocity( ) );
+				FVector LocalVel = GetComponentTransform().TransformVector( Actor->GetVelocity( ) );
 				float HorizVelMag = LocalVel.Size( );
 
 				Pling( Actor->GetActorLocation( ), RippleVelocityFactor * HorizVelMag, Actor->GetSimpleCollisionRadius( ) );
@@ -310,7 +330,7 @@ void UFluidSurfaceComponent::TickComponent( float DeltaTime, enum ELevelTick Tic
 			LocalRipplePos.Y = ( RippleRadius * FMath::Cos( TestRippleAng ) );
 			LocalRipplePos.Z = 0.f;
 
-			WorldRipplePos = GetComponentTransform( ).Inverse( ).TransformPosition( LocalRipplePos );
+			WorldRipplePos = GetComponentTransform().TransformPosition( LocalRipplePos );
 			Pling( WorldRipplePos, TestRippleStrength, TestRippleRadius );
 		}
 
@@ -450,6 +470,11 @@ FColor UFluidSurfaceComponent::GetWireframeColor( ) const
 void UFluidSurfaceComponent::BeginDestroy( )
 {
 	Super::BeginDestroy( );
+}
+
+void UFluidSurfaceComponent::PostLoad()
+{
+	Super::PostLoad();
 }
 
 UBodySetup* UFluidSurfaceComponent::GetBodySetup( )

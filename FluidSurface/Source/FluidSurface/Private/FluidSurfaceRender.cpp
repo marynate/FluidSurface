@@ -622,14 +622,8 @@ FFluidSurfaceSceneProxy::~FFluidSurfaceSceneProxy( )
 	if( DynamicData != NULL ) { delete DynamicData; }
 }
 
-SIZE_T FFluidSurfaceSceneProxy::GetTypeHash( ) const
-{
-	static size_t UniquePointer;
-	return reinterpret_cast< size_t >( &UniquePointer );
-}
-
 /** Returns the view revelance */
-FPrimitiveViewRelevance FFluidSurfaceSceneProxy::GetViewRelevance( const FSceneView* View )
+FPrimitiveViewRelevance FFluidSurfaceSceneProxy::GetViewRelevance(const FSceneView* View) const
 {
 	FPrimitiveViewRelevance Result;
 	Result.bDrawRelevance = IsShown( View );
