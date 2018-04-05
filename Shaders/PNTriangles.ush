@@ -1,4 +1,4 @@
-// Copyright 1998-2017 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
 
 /*=============================================================================
 	PNTriangles.usf: Shader fragments for PN-AEN triangles tessellation
@@ -30,6 +30,9 @@ struct FPNTessellationHSToDS
 
 	// Tessellation multiplier.
 	float TessellationMultiplier : PN_TessellationMultiplier;
+
+	// World displacement falloff multiplier.
+	float WorldDisplacementMultiplier : PN_WorldDisplacementMultiplier;
 
 #if DISPLACEMENT_ANTICRACK
 	// dominant edge and vertex data used to avoid cracking when displacing
@@ -125,6 +128,7 @@ float4 ComputeControlPoint(float4 PositionA, float4 PositionB, float4 NormalA)
 		O.PassSpecificData = I[ControlPointID];
 		O.WorldPosition[0] = I[ControlPointID].Position;
 		O.TessellationMultiplier = GetTessellationMultiplier( I[ControlPointID] );
+		O.WorldDisplacementMultiplier = GetTessellationWorldDisplacementMultiplier(I[ControlPointID], O.TessellationMultiplier);
 
 #if DISPLACEMENT_ANTICRACK
 		// NextControlPointID is first opposite edge vert
@@ -270,14 +274,16 @@ float4 ComputeControlPoint(float4 PositionA, float4 PositionB, float4 NormalA)
 		// tangent space displacement scaling
 		DisplacementMaterialParameters.TangentToWorldPreScale = I[0].DisplacementScale*U + I[1].DisplacementScale*V + I[2].DisplacementScale*W;
 
+		float WorldDisplacementMultiplier = I[0].WorldDisplacementMultiplier*U + I[1].WorldDisplacementMultiplier*V + I[2].WorldDisplacementMultiplier*W;
+
 #if USE_FLUIDSURFACE
 		// Apply fluid surface displacement before material displacement
 		float3 FluidDisplacement = VertexFactoryGetWorldDisplacement(GetTextureCoordinateDS( Interp ));
-		WorldPosition.xyz += FluidDisplacement;
+		WorldPosition.xyz += FluidDisplacement * WorldDisplacementMultiplier;
 #endif
 		// world space displacement value.  This will likely use the tangent2world transform.
 		float3 WorldDisplacement = GetMaterialWorldDisplacement(DisplacementMaterialParameters);
-		WorldPosition.xyz += WorldDisplacement;
+		WorldPosition.xyz += WorldDisplacement * WorldDisplacementMultiplier;
 										
 		#if USE_GLOBAL_CLIP_PLANE
 			OutGlobalClipPlaneDistance = dot(ResolvedView.GlobalClippingPlane, float4(WorldPosition.xyz - ResolvedView.PreViewTranslation.xyz, 1));

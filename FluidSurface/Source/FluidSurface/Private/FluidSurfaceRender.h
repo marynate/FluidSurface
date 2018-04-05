@@ -144,6 +144,7 @@ public:
 	virtual ~FFluidSurfaceSceneProxy( );
 
 	/* Begin UPrimitiveSceneProxy interface */
+	virtual SIZE_T GetTypeHash() const override;
 	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) const override;
 	virtual uint32 GetMemoryFootprint( ) const;
 	uint32 GetAllocatedSize( ) const;

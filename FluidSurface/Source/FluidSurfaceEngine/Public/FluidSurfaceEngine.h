@@ -128,7 +128,13 @@ class FLUIDSURFACEENGINE_API FFluidSurfaceVertexFactory : public FLocalVertexFac
 public:
 
 	/** Default constructor */
-	FFluidSurfaceVertexFactory( )
+	FFluidSurfaceVertexFactory()
+		: FLocalVertexFactory(ERHIFeatureLevel::SM4, "FluidSurfaceVertexFactory", nullptr)
+	{}
+
+	/** Default constructor */
+	FFluidSurfaceVertexFactory(ERHIFeatureLevel::Type InFeatureLevel, const char* InDebugName, const FStaticMeshDataType* InStaticMeshDataType = nullptr)
+		: FLocalVertexFactory(InFeatureLevel, InDebugName, InStaticMeshDataType)
 	{}
 
 	/** Initialization */
@@ -192,8 +198,13 @@ public:
 	/** Cache only when using SM5 */
 	static bool ShouldCache( EShaderPlatform Platform ) { return IsFeatureLevelSupported( Platform, ERHIFeatureLevel::SM5 ); }
 
+	static bool ShouldCompilePermutation(const FGlobalShaderPermutationParameters& Parameters)
+	{
+		return ShouldCache(Parameters.Platform);
+	}
+
 	/** Modify compilation environment */
-	static void ModifyCompilationEnvironment(EShaderPlatform Platform, FShaderCompilerEnvironment& OutEnvironment);
+	static void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment);
 
 
 	/** Serialization */
