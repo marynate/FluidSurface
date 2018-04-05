@@ -1,6 +1,9 @@
 
-#include "FluidSurfacePrivatePCH.h"
+#include "FluidSurfaceComponent.h"
+
 #include "FluidSurfaceRender.h"
+
+#include "FluidSurfaceModifier.h"
 
 #include "Particles/Emitter.h"
 #include "Particles/ParticleSystemComponent.h"
@@ -58,7 +61,7 @@ UFluidSurfaceComponent::UFluidSurfaceComponent(const FObjectInitializer& ObjectI
 	UpdateComponent = true;
 	
 	/* Create dynamic delegate for overlapped event */
-	OnComponentBeginOverlap.AddDynamic( this, &UFluidSurfaceComponent::ComponentTouched );
+	OnComponentBeginOverlap.AddDynamic( this, &UFluidSurfaceComponent::ComponentBeginOverlap );
 }
 
 #if WITH_EDITOR
@@ -154,7 +157,8 @@ void UFluidSurfaceComponent::Pling( const FVector& Position, float Strength, flo
 	int HitX, HitY;
 	GetNearestIndex( Position, HitX, HitY );
 
-	PLingBuffer[ NumPLing ].LocalHitPosition = GetWorldToComponent( ).TransformPosition( Position );
+	PLingBuffer[ NumPLing ].LocalHitPosition = GetComponentTransform( ).Inverse( ).TransformPosition( Position );
+	
 	PLingBuffer[ NumPLing ].HitX = HitX;
 	PLingBuffer[ NumPLing ].HitY = HitY;
 	PLingBuffer[ NumPLing ].Strength = Strength;
@@ -166,7 +170,7 @@ void UFluidSurfaceComponent::Pling( const FVector& Position, float Strength, flo
 /** Get nearest index */
 void UFluidSurfaceComponent::GetNearestIndex( const FVector& Pos, int& xIndex, int& yIndex )
 {
-	FVector LocalPos = GetWorldToComponent( ).TransformPosition( Pos );
+	FVector LocalPos = GetComponentTransform( ).Inverse( ).TransformPosition( Pos );
 
 	xIndex = FMath::RoundToInt( ( LocalPos.X - FluidOrigin.X ) / FluidGridSpacing );
 	xIndex = FMath::Clamp( xIndex, 0, FluidXSize - 1 );
@@ -217,7 +221,7 @@ void UFluidSurfaceComponent::OnRegister( )
 void UFluidSurfaceComponent::CreateRenderState_Concurrent()
 {
 	/* Create render data */
-	RenderData = new FFluidSurfaceRenderData();
+	RenderData = MakeUnique< FFluidSurfaceRenderData >( );
 	RenderData->InitResources(this);
 
 	Super::CreateRenderState_Concurrent();
@@ -281,7 +285,7 @@ void UFluidSurfaceComponent::TickComponent( float DeltaTime, enum ELevelTick Tic
 			/* Dont care about self and modifiers */
 			if( Actor != NULL && !Actor->IsA( AFluidSurfaceActor::StaticClass( ) ) && !Actor->IsA( AFluidSurfaceModifier::StaticClass( ) ) )
 			{
-				FVector LocalVel = GetWorldToComponent( ).TransformVector( Actor->GetVelocity( ) );
+				FVector LocalVel = GetComponentTransform( ).Inverse( ).TransformVector( Actor->GetVelocity( ) );
 				float HorizVelMag = LocalVel.Size( );
 
 				Pling( Actor->GetActorLocation( ), RippleVelocityFactor * HorizVelMag, Actor->GetSimpleCollisionRadius( ) );
@@ -304,7 +308,7 @@ void UFluidSurfaceComponent::TickComponent( float DeltaTime, enum ELevelTick Tic
 			LocalRipplePos.Y = ( RippleRadius * FMath::Cos( TestRippleAng ) );
 			LocalRipplePos.Z = 0.f;
 
-			WorldRipplePos = ComponentToWorld.TransformPosition( LocalRipplePos );
+			WorldRipplePos = GetComponentTransform( ).Inverse( ).TransformPosition( LocalRipplePos );
 			Pling( WorldRipplePos, TestRippleStrength, TestRippleRadius );
 		}
 
@@ -339,24 +343,24 @@ void UFluidSurfaceComponent::ReceiveComponentDamage( float DamageAmount, FDamage
 		/* Spawn shoot effect emitter */
 		FRotator Rotation = FRotator( 0, 0, 0 );
 		AEmitter* Emitter = GetWorld( )->SpawnActor<AEmitter>( HitLocation, Rotation );
-		Emitter->ParticleSystemComponent->SetTemplate( ShootEffect );
+		Emitter->GetParticleSystemComponent( )->SetTemplate( ShootEffect );
 	}
 }
 
 /** Called when an object has overlapped this component */
-void UFluidSurfaceComponent::ComponentTouched( AActor* Other, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult )
+void UFluidSurfaceComponent::ComponentBeginOverlap( UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult )
 {
-	if( !Other )
+	if( !OtherActor )
 		return;
 
-	FVector ActorLocation = Other->GetActorLocation( );
+	FVector ActorLocation = OtherActor->GetActorLocation( );
 
 	if( TouchEffect )
 	{
 		/* Spawn touch effect emitter */
 		FRotator Rotation = FRotator( 0, 0, 0 );
 		AEmitter* Emitter = GetWorld( )->SpawnActor<AEmitter>( ActorLocation, Rotation );
-		Emitter->ParticleSystemComponent->SetTemplate( TouchEffect );
+		Emitter->GetParticleSystemComponent( )->SetTemplate( TouchEffect );
 	}
 }
 
@@ -374,7 +378,7 @@ void UFluidSurfaceComponent::UpdateBody( )
 	FVector BoxExtents = FluidBoundingBox.GetExtent( );
 	FKBoxElem& BoxElem = *new ( BodySetup->AggGeom.BoxElems ) FKBoxElem( BoxExtents.X * 2, BoxExtents.Y * 2, BoxExtents.Z * 2 );
 	BoxElem.Center = FVector::ZeroVector;
-	BoxElem.Orientation = GetComponentQuat( );
+	BoxElem.Rotation = FRotator( GetComponentQuat( ) );
 	
 	BodySetup->ClearPhysicsMeshes( );
 	BodySetup->CreatePhysicsMeshes( );
@@ -444,18 +448,6 @@ FColor UFluidSurfaceComponent::GetWireframeColor( ) const
 void UFluidSurfaceComponent::BeginDestroy( )
 {
 	Super::BeginDestroy( );
-}
-
-void UFluidSurfaceComponent::CreatePhysicsState( )
-{
-#if WITH_EDITOR
-	if( bPhysicsStateCreated )
-		DestroyPhysicsState( );
-
-	UpdateBody( );
-#endif
-
-	return Super::CreatePhysicsState( );
 }
 
 UBodySetup* UFluidSurfaceComponent::GetBodySetup( )

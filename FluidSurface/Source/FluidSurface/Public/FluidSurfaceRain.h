@@ -1,6 +1,11 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
+#include "UObject/ObjectMacros.h"
+
+#include "GameFramework/Actor.h"
+
 #include "FluidSurfaceRain.generated.h"
 
 /** Example extension of the Fluid Surface Modifier, to simulate rain falling */

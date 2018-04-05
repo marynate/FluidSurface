@@ -1,6 +1,11 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
+#include "UObject/ObjectMacros.h"
+
+#include "GameFramework/Actor.h"
+
 #include "FluidSurfaceOscillator.generated.h"
 
 /** Fluid Surface modifier extension to perform oscillation */

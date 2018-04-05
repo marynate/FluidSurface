@@ -1,28 +1,26 @@
-// Copyright 1998-2014 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2018 Epic Games, Inc. All Rights Reserved.
+using UnrealBuildTool;
 
-namespace UnrealBuildTool.Rules
+public class FluidSurfaceEngine : ModuleRules
 {
-	public class FluidSurfaceEngine : ModuleRules
+	public FluidSurfaceEngine(ReadOnlyTargetRules Target) : base(Target)
 	{
-		public FluidSurfaceEngine(TargetInfo Target)
-		{
-			PrivateIncludePaths.AddRange(
-				new string[] {
-					"FluidSurfaceEngine/Private"
-				}
-				);
+		PrivateIncludePaths.AddRange(
+			new string[] {
+				"FluidSurfaceEngine/Private"
+			}
+			);
 
-			PublicDependencyModuleNames.AddRange(
-				new string[]
-				{
-					"Core",
-					"CoreUObject",
-                    "Engine",
-                    "RenderCore",
-                    "ShaderCore",
-                    "RHI"
-				}
-				);
-		}
+		PublicDependencyModuleNames.AddRange(
+			new string[]
+			{
+				"Core",
+				"CoreUObject",
+				"Engine",
+				"RenderCore",
+				"ShaderCore",
+				"RHI"
+			}
+		);
 	}
 }

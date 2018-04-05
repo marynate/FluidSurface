@@ -4,7 +4,7 @@
 	FluidSurfaceShader.usf: Shader to compute fluid surfaces.
 ==============================================================================*/
 
-#include "Common.usf"
+#include "Common.ush"
 
 /** 
 
