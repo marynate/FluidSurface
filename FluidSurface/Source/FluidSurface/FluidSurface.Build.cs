@@ -5,6 +5,8 @@ public class FluidSurface : ModuleRules
 {
 	public FluidSurface(ReadOnlyTargetRules Target) : base(Target)
 	{
+		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+
 		PrivateIncludePaths.AddRange(
 			new string[] {
 				"FluidSurface/Private",
