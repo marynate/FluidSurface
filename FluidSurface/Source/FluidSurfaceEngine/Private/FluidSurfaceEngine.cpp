@@ -145,9 +145,9 @@ FFluidSurfaceCS::FFluidSurfaceCS( const ShaderMetaType::CompiledShaderInitialize
 }
 
 /* Sets flags to use during compilation of this shader */
-void FFluidSurfaceCS::ModifyCompilationEnvironment( const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment )
+void FFluidSurfaceCS::ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
 {
-	FGlobalShader::ModifyCompilationEnvironment( Parameters, OutEnvironment );
+	FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
 	OutEnvironment.CompilerFlags.Add( CFLAG_StandardOptimization );
 }
 

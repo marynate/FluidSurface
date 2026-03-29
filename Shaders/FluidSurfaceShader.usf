@@ -5,6 +5,7 @@
 ==============================================================================*/
 
 #include "Common.ush"
+#include "Random.ush"
 
 /** 
 
@@ -101,6 +102,28 @@ float GetOldVertex( int2 Pos )
 	{
 		return FluidVerts1[ Pos.y * FluidSurfaceParams.FluidXSize + Pos.x ];
 	}
+}
+
+float ComputeRandomFrom2DPosition(uint2 v)
+{
+	return (ScrambleTEA(v).x & 0xffff ) / (float)(0xffff) * 2 - 1;
+}
+
+float2 PerlinNoise2D_ALU(float2 fv)
+{
+	int2 iv = int2(floor(fv));
+
+	float2 a = ComputeRandomFrom2DPosition(iv + int2(0, 0));
+	float2 b = ComputeRandomFrom2DPosition(iv + int2(1, 0));
+	float2 c = ComputeRandomFrom2DPosition(iv + int2(0, 1));
+	float2 d = ComputeRandomFrom2DPosition(iv + int2(1, 1));
+
+	float2 Weights = PerlinRamp(float4(frac(fv), 0, 0)).xy;
+
+	float2 e = lerp(a, b, Weights.x);
+	float2 f = lerp(c, d, Weights.x);
+
+	return lerp(e, f, Weights.y);
 }
 
 /** Returns a random value between 0 - 32767 */

@@ -2,11 +2,19 @@
 #pragma once
 
 #include "FluidSurfaceEngine.h"
+<<<<<<< HEAD
 
 #include "TessellationRendering.h"
 #include "PhysicsEngine/BodySetup.h"
 
 #include "FluidSurfaceActor.h"
+=======
+#include "FluidSurfaceActor.h"
+
+#include "TessellationRendering.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "PrimitiveSceneProxy.h"
+>>>>>>> marynate/master
 
 #define MAX_FLUID_PLINGS 1024
 
@@ -144,8 +152,13 @@ public:
 	virtual ~FFluidSurfaceSceneProxy( );
 
 	/* Begin UPrimitiveSceneProxy interface */
+<<<<<<< HEAD
 	virtual SIZE_T GetTypeHash( ) const override;
 	virtual FPrimitiveViewRelevance GetViewRelevance( const FSceneView* View );
+=======
+	virtual SIZE_T GetTypeHash() const override;
+	virtual FPrimitiveViewRelevance GetViewRelevance(const FSceneView* View) const override;
+>>>>>>> marynate/master
 	virtual uint32 GetMemoryFootprint( ) const;
 	uint32 GetAllocatedSize( ) const;
 	virtual void GetDynamicMeshElements( const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector ) const override;

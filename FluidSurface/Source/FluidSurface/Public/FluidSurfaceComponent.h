@@ -45,7 +45,7 @@ class UFluidSurfaceComponent : public UMeshComponent
 
 	/* Begin UObject interace */
 	virtual void BeginDestroy( ) override;
-
+	virtual void PostLoad() override;
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty( FPropertyChangedEvent& PropertyChangedEvent ) override;
 #endif
